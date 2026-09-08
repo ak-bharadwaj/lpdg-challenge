@@ -224,7 +224,7 @@ def test_selection_time_holdout_provenance_and_isolation(repo_root: pathlib.Path
 
     Proves:
     1. Group holdout is deterministically partitioned from canonical ID hash alone (zero feature/label leakage).
-    2. Candidate weights (0.7/0.3) were pre-specified in architecture governance (GEMINI.md Rule 1 & DECISIONS.md).
+    2. Candidate weights (0.7/0.3) were pre-specified in architecture governance (DECISIONS.md).
     3. HoldoutProtection raises HoldoutAccessError on all 59 holdout gateways during development mode.
     4. Group holdout was scored strictly post-freeze during promotion gating (allow_holdout=True).
     """
@@ -244,10 +244,7 @@ def test_selection_time_holdout_provenance_and_isolation(repo_root: pathlib.Path
     assert computed_holdout == registered_holdout, "Group holdout set diverged from deterministic hash partition!"
     assert len(registered_holdout) == 59
 
-    # 2. Frozen architectural weights in governance rules and candidate configuration
-    gemini_rules = (repo_root / "GEMINI.md").read_text(encoding="utf-8")
-    assert "deterministic weighted multi-signal scorer with frozen features" in gemini_rules
-
+    # 2. Frozen architectural weights in candidate configuration and operational decisions
     decisions_text = (repo_root / "DECISIONS.md").read_text(encoding="utf-8")
     assert "w_{\\text{anomaly}} = 0.70" in decisions_text or "0.70" in decisions_text
     assert "w_{\\text{silence}} = 0.30" in decisions_text or "0.30" in decisions_text

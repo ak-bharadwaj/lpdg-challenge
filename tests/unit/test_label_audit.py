@@ -2,7 +2,7 @@
 
 Frozen Architecture References:
 - docs/ARCHITECTURE_v25_FREEZE.md: Sections 2, 2C, 2D, 2E, 8.
-- GEMINI.md: Rules 1, 2, 3, 4, 5, 8.
+- docs/DECISIONS.md: Operational Governance.
 """
 import ast
 import datetime as dt

@@ -258,24 +258,33 @@ def audit_gateway_telemetry_status(
 
 
 class HoldoutProtection:
-    """Programmatic guard protecting holdouts and post-cutoff files (GEMINI.md Rule 8 & v25 Section 2C)."""
+    """Programmatic guard protecting holdouts and post-cutoff files (v25 Architecture Freeze Section 2C & Rule 8)."""
 
     DEVELOPMENT_CUTOFF: dt.date = dt.date(2026, 1, 31)
-    POST_CUTOFF_FILES: Set[str] = {
-        "engineer_review_2026-02.xlsx",
-        "engineer_review_2026-02.csv",
-    }
 
     @classmethod
-    def check_file_access(cls, file_path: str | Any, allow_holdout: bool = False) -> None:
-        """Check if file path points to a protected holdout or post-cutoff file."""
-        import pathlib
-        p = pathlib.Path(file_path)
-        if p.name in cls.POST_CUTOFF_FILES:
-            if not allow_holdout:
+    def check_gateway_access(
+        cls,
+        gateway_id: str,
+        group_holdout_ids: Set[str],
+        allow_holdout: bool = False,
+    ) -> None:
+        """Check if gateway access is permitted under holdout rules."""
+        if not allow_holdout and gateway_id in group_holdout_ids:
+            raise HoldoutAccessError(
+                f"Access denied to gateway '{gateway_id}': Part of grouped holdout set. "
+                f"v25 Architecture Freeze Rule 8 forbids holdout access during development."
+            )
+
+    @classmethod
+    def check_file_access(cls, file_path: str, allow_holdout: bool = False) -> None:
+        """Check if file access is permitted under post-cutoff rules."""
+        if not allow_holdout:
+            path_str = str(file_path).lower()
+            if "engineer_review_2026-02" in path_str:
                 raise HoldoutAccessError(
-                    f"Unauthorized access to post-cutoff holdout file '{p.name}'. "
-                    f"GEMINI.md Rule 8 forbids post-cutoff access during development."
+                    f"Unauthorized access to post-cutoff holdout file '{file_path}'. "
+                    f"v25 Architecture Freeze Rule 8 forbids post-cutoff access during development."
                 )
 
     @classmethod

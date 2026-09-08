@@ -23,7 +23,7 @@ Conforming strictly to Challenge Brief Part 1 Section 7 and ARCHITECTURE_v25_FRE
 ## Detailed Minute-by-Minute Cue-Sheet
 
 ### 0:00 – 1:00: The Problem in One Sentence & Track F Rationale
-- **Screen Action**: Display repository root, showing `DECISIONS.md` and `GEMINI.md`.
+- **Screen Action**: Display repository root, showing `DECISIONS.md` and `MLOPS.md`.
 - **Spoken Dialogue**:
   > *"Good morning. As an Operations Manager for LPDG, my responsibility every Monday morning is allocating our fixed technician fleet: exactly 15 truck rolls per week across 8 operational weeks, committing €45,600 in physical technician costs, while mitigating €600 weekly penalties for broken customer gateways.
   > 
