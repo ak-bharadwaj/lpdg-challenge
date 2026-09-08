@@ -64,3 +64,21 @@ Per v25 Architecture Section 2C & Section 2E:
 - **Holdout & Development Leakage Isolation**: The 59 grouped holdout gateways (`GROUP_HOLDOUT_IDS`) and post-cutoff evidence (`engineer_review_2026-02.xlsx`) were strictly quarantined and prohibited from being inspected, summarized, or allowed to motivate feature selection, weighting, or label definitions during EDA.
 - **Frozen Candidate Features**: At the four-hour deadline, feature definitions and candidate weights ($w_{\text{anomaly}} = 0.70$, $w_{\text{silence}} = 0.30$) were permanently frozen. Reopening features during development was prohibited, preventing post-hoc parameter snooping.
 
+## Written Retraining & Degradation Rule (Challenge Part 2F)
+
+In strict accordance with the Challenge Brief requirements for Track F (MLOps):
+
+1. **When We Would Retrain**:
+   - Codified in `policy.json` (`retraining_governance.degradation_threshold = 1.10`): retraining is triggered when operational monitoring indicates active model fault penalty increases by $\ge 10\%$ over the reference baseline, or when a new quarter of verified field repair outcomes is ingested.
+   - Per `policy.json` (`auto_retrain: false`), retraining is **never automated** directly into production. Triggering only authorizes offline candidate materialization (`scripts/train.py --candidate <version>`). Production state is never mutated by training.
+
+2. **How We Know Retraining Made Things Worse**:
+   - The four-condition deterministic promotion gate (`scripts/promote.py`, `tests/unit/test_evidence_gate.py`) evaluates the retrained candidate against production over 3 expanding temporal windows (Nov, Dec, Jan) plus the quarantined grouped holdout (`GROUP_HOLDOUT_IDS`).
+   - Retraining is proven worse and fails closed if:
+     - It fails the $\ge 10\%$ aggregate cost differential bar (`REJECT_NOT_BETTER`).
+     - It regresses in any individual temporal window (`REJECT_WINDOW_REGRESSION`).
+     - It disagrees in direction on the unseen 59-gateway holdout (`REJECT_GROUPED_DISAGREEMENT`).
+     - Common population coverage falls below 90% (`REJECT_COVERAGE`).
+   - **Empirical Proof**: When candidate `v0002` was trained, it improved by 15.49% on the development fleet but caused 1 additional missed broken gateway on the unseen holdout (17 missed in active vs 18 in candidate). The promotion policy strictly caught this regression, issued `REJECT_GROUPED_DISAGREEMENT`, and preserved production on `v0001` (empirically tested in `tests/unit/test_evidence_gate.py::test_candidate_worse_is_rejected`).
+
+
