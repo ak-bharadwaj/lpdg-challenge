@@ -118,10 +118,10 @@ Conforming strictly to Challenge Brief Part 1 Section 7 and ARCHITECTURE_v25_FRE
   > *"We close with operational honesty. In `LIMITATIONS.md`, we disclose that of 332 registered gateways, exactly 12 units—3.61% of our fleet—have zero historical telemetry records. We classify them as `NO_TELEMETRY` rather than inventing calm scores.
   > 
   > If given two additional operational weeks, our priorities are clear:
-  > 1. Fit pre-failure survival hazard curves to recover 7 to 14 days of lead time before total outage occurs.
-  > 2. Audit carrier cellular SIM provisioning to bring the 12 blind-spot units online.
-  > 3. Implement automated multivariate concept drift monitoring in `scripts/check_drift.py`.
-  > 4. Close loop reviews with regional technicians on the 14 right-censored work orders.
+  > 1. Ingest fresh, synchronized meter-read telemetry to eliminate the 2026-01-26 snapshot lag.
+  > 2. Implement dual-channel silence detection to catch complete communication blackouts before they drop into the backlog.
+  > 3. Jointly optimize dispatch by weighting anomaly persistence with customer unread meter exposure.
+  > 4. Audit carrier cellular SIM provisioning to bring the 12 blind-spot units online.
   > 
   > Thank you. The repository is clean, deterministic, and fully auditable."*
 

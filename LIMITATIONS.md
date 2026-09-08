@@ -49,23 +49,23 @@ In strict accordance with Challenge Part 1 deliverables and ARCHITECTURE_v25_FRE
 
 ## 5. What Two Additional Weeks of Operational & Engineering Time Would Change
 
-If granted two additional weeks of engineering and operational development time, the following four enhancements would be implemented:
+If granted two additional weeks of engineering and operational development time, the following enhancements would be prioritized directly based on our empirical Part 1 audit findings:
 
-1. **Lead-Time Pre-Failure Hazard Modeling**:
-   - Fit a calibrated survival analysis model (e.g., Weibull accelerated failure time) on the 218 confirmed hardware repair episodes to predict failure probability 7–14 days *prior* to full functional collapse.
-   - **Economic Benefit**: Recovers approximately 1 week of lead time per true fault, saving an estimated €600 per detected hardware failure by dispatching technicians before service disruption occurs.
+1. **Fresh Meter-Read Telemetry Ingestion & Lag Elimination**:
+   - Ingest synchronized meter-read telemetry post-January 26, 2026 to eliminate the static snapshot lag in `meter_read_success.csv`.
+   - **Operational Benefit**: Resolves whether deferred gateways with read rates under 80% (such as `0A55DA266F71`) persisted in customer-impacting failure states or recovered naturally.
 
-2. **Carrier Cellular Provisioning Reconciliation for the 12 Blind-Spot Gateways**:
-   - Cross-reference the 12 zero-telemetry gateways with mobile network operator (MNO) SIM registration logs and installation work orders.
-   - **Operational Benefit**: Resolves whether these 12 units represent uncommissioned hardware, antenna orientation failures, or dead cellular modems, eliminating the 3.61% fleet blind spot.
+2. **Dual-Channel Silence & Blackout Detection**:
+   - Implement an authoritative missingness detector that flags sustained telemetry communication blackout (e.g. >48 consecutive missing hourly records) as an independent high-severity dispatch trigger.
+   - **Reliability Benefit**: Eliminates the 3-sigma baseline's "silent failure blindness," preventing completely dead gateways (such as `02423E0E6E9F`, which had 91–113 missing hours and confirmed physical repairs) from dropping to ranks 64–202.
 
-3. **Multivariate Statistical Concept Drift Monitoring**:
-   - Expand `scripts/check_drift.py` from structural schema monitoring to continuous Population Stability Index (PSI) and Kolmogorov-Smirnov statistics across key telemetry features (`snr_db`, `rssi_dbm`, `battery_voltage_v`).
-   - **Reliability Benefit**: Flags network-wide cellular carrier degradation or firmware regressions before they manifest as catastrophic gateway outages.
+3. **Customer Revenue & Billing Exposure Calibration**:
+   - Jointly optimize dispatch priority by weighting anomaly persistence with unread meter exposure ($\text{unread\_meters} = n\_meters \times (1 - \text{read\_rate})$).
+   - **Economic Benefit**: Prioritizes high-density gateways (>400 meters) in partial failure over low-density gateways (<50 meters) with minor intermittent blips, directly protecting utility billing SLAs.
 
-4. **Technician Review Closure for Right-Censored Work Orders**:
-    - Establish an active feedback loop with regional operations to verify terminal outcomes for the 14 late-January/February work orders currently classified as `UNKNOWN_RIGHT_CENSORED`.
-    - **Evaluation Benefit**: Expands the verified evaluation cohort beyond the current 137 confirmed broken gateway-weeks, sharpening promotion gate statistical power.
+4. **Lead-Time Pre-Failure Hazard Modeling & Blind-Spot SIM Audit**:
+   - Fit a calibrated survival analysis model on confirmed hardware repair episodes to predict failure 7–14 days prior to collapse.
+   - Audit mobile carrier SIM provisioning to diagnose and bring online the 12 zero-telemetry blind-spot units (3.61% of fleet).
 
 ---
 
