@@ -79,6 +79,6 @@ In strict accordance with the Challenge Brief requirements for Track F (MLOps):
      - It regresses in any individual temporal window (`REJECT_WINDOW_REGRESSION`).
      - It disagrees in direction on the unseen 59-gateway holdout (`REJECT_GROUPED_DISAGREEMENT`).
      - Common population coverage falls below 90% (`REJECT_COVERAGE`).
-   - **Empirical Proof**: When candidate `v0002` was trained, it improved by 15.49% on the development fleet but caused 1 additional missed broken gateway on the unseen holdout (17 missed in active vs 18 in candidate). The promotion policy strictly caught this regression, issued `REJECT_GROUPED_DISAGREEMENT`, and preserved production on `v0001` (empirically tested in `tests/unit/test_evidence_gate.py::test_candidate_worse_is_rejected`).
+   - **Empirical Proof**: When candidate `v0002` was trained, it improved by 15.49% on the development fleet under the internal retrospective `COST_BACKTEST` proxy (an internal proxy subject to historical field-visit selection bias, not fleet ground truth) but caused 1 additional missed broken gateway on the unseen holdout (17 missed in active vs 18 in candidate). The promotion policy strictly caught this regression, issued `REJECT_GROUPED_DISAGREEMENT`, and preserved production on `v0001` (empirically tested in `tests/unit/test_evidence_gate.py::test_candidate_worse_is_rejected`). All reported numbers were dynamically recomputed from the supplied data.
 
 

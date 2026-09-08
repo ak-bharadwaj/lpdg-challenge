@@ -15,6 +15,8 @@ root_dir = pathlib.Path(__file__).resolve().parent.parent
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
+from app.data.quality import SourceCompletenessError
+from app.data.schema import SchemaValidationError
 from app.model.predict import (
     InsufficientEligibleGatewaysError,
     ModelArtifactError,
@@ -24,6 +26,7 @@ from app.model.predict import (
     resolve_active_model_version,
     write_run_record,
 )
+
 
 SCORED_WEEKS = [dt.date(2026, 2, 2) + dt.timedelta(days=7 * i) for i in range(8)]
 
@@ -73,8 +76,20 @@ def main() -> None:
     for monday in SCORED_WEEKS:
         try:
             result = predict_week(data_dir=args.data, week_start=monday)
-        except (ModelArtifactError, InsufficientEligibleGatewaysError, FileNotFoundError) as exc:
+        except (
+            ModelArtifactError,
+            InsufficientEligibleGatewaysError,
+            SchemaValidationError,
+            SourceCompletenessError,
+            FileNotFoundError,
+        ) as exc:
             print(f"ERROR: Inference failed for week {monday}: {exc}", file=sys.stderr)
+            sys.exit(1)
+        except Exception as exc:
+            import traceback
+
+            print(f"ERROR: Unexpected inference error for week {monday}: {exc}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             sys.exit(1)
 
         if first_week_backlog is None and "backlog_report" in result:

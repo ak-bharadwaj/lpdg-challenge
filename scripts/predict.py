@@ -12,6 +12,8 @@ root_dir = pathlib.Path(__file__).resolve().parent.parent
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
+from app.data.quality import SourceCompletenessError
+from app.data.schema import SchemaValidationError
 from app.model.predict import (
     InsufficientEligibleGatewaysError,
     ModelArtifactError,
@@ -19,6 +21,7 @@ from app.model.predict import (
     resolve_active_model_version,
     write_run_record,
 )
+
 
 
 def main() -> None:
@@ -90,8 +93,20 @@ def main() -> None:
 
     try:
         result = predict_week(data_dir=args.data, week_start=args.week)
-    except (ModelArtifactError, InsufficientEligibleGatewaysError, FileNotFoundError, Exception) as exc:
+    except (
+        ModelArtifactError,
+        InsufficientEligibleGatewaysError,
+        SchemaValidationError,
+        SourceCompletenessError,
+        FileNotFoundError,
+    ) as exc:
         print(f"ERROR: Inference failed: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as exc:
+        import traceback
+
+        print(f"ERROR: Unexpected inference error: {exc}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
 
     # Write predictions.csv with strictly 6-decimal float formatting and LF line endings

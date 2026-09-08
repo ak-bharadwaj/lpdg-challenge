@@ -75,9 +75,9 @@ Conforming strictly to Challenge Brief Part 1 Section 7 and ARCHITECTURE_v25_FRE
 - **Spoken Dialogue**:
   > *"Now for the central operational decision: why did we NOT promote candidate `v0002`?
   > 
-  > Our promotion gate is governed by a strict four-condition policy evaluated across three expanding temporal windows (November, December, January) plus an isolated grouped holdout of 59 gateways.
+  > Our promotion gate is governed by a strict four-condition policy evaluated across three expanding temporal windows (November, December, January) plus an isolated grouped holdout of 59 gateways. All reported figures were dynamically recomputed from the supplied data, and we treat field visits explicitly as a selection-biased retrospective proxy rather than fleet-wide ground truth.
   > 
-  > On historical development windows, `v0002` looked great: it reduced missed broken weeks from 71 to 60, an apparent €6,600 penalty savings. But on the 59 held-out gateways—hardware the model had never seen—the candidate regressed, missing 18 broken weeks compared to 17 in the active model.
+  > Under this internal retrospective cost-backtest proxy on historical development windows, `v0002` reduced missed broken weeks from 71 to 60, representing an internal €6,600 penalty savings proxy. But on the 59 held-out gateways—hardware the model had never seen—the candidate regressed, missing 18 broken weeks compared to 17 in the active model.
   > 
   > Under our frozen gate rule, aggregate gains cannot overwrite holdout regression. The promotion gate issued an authoritative `REJECT_GROUPED_DISAGREEMENT`. Production remained safely locked on `v0001`. Rejection is a successful lifecycle outcome."*
 

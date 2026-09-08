@@ -34,7 +34,9 @@ In strict accordance with Challenge Part 1 deliverables and ARCHITECTURE_v25_FRE
   - Of 628 historical visits through January 31, 2026, 382 visits (60.8%) were false alarms (`Kein Fehler gefunden`).
   - Only 218 visits involved confirmed physical component replacements (`Fehler behoben`).
   - Crucially, no record exists for gateways that failed silently and were never inspected by technicians.
-- **Operational Consequence**: Any simulated cost-avoidance metric (€600/week fault penalty delta) measures precision-oriented performance on observed operational dispatches, with zero fleet-wide recall guarantees.
+- **Operational Consequence**: Any simulated cost-avoidance metric (€600/week fault penalty delta) measures precision-oriented performance on observed operational dispatches under an internal retrospective proxy, with zero fleet-wide recall guarantees. All reported figures were dynamically recomputed from the supplied data; the field-visit evaluation is explicitly treated as a selection-biased retrospective proxy.
+- **Pre-Cutoff Meter-Read Evidence**: The latest available pre-cutoff week is 2026-01-26 (as meter_read_success.csv ends on 2026-01-26; no 2026-02-02 meter data exists), where dispatched gateways had an 18.76 percentage-point lower mean meter-read success rate (66.87% vs 85.63%).
+- **Engineer Review Subset**: Of the 120 dispatched gateways, 27 were present in the independent engineer review audit (ngineer_review_2026-02.xlsx). 12 were rated *Schlecht* (confirmed hardware defect) and 3 *nach Tausch stabil* (recent physical replacement), representing 15 / 27 = 55.6% of the reviewed subset (not a fleet-wide confirmation).
 
 ---
 

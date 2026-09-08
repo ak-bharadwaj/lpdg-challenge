@@ -1,12 +1,13 @@
 ================================================================================
 RESQ-MLOPS FINAL SUBMISSION EXECUTION EVIDENCE & LIFECYCLE CERTIFICATION
 ================================================================================
-Timestamp (UTC):             2026-09-06T18:05:00+00:00
-Implementation Commit SHA:   72cfecbb30a8358da46a4f7b9a419aea3a3ac883
-Registry State Commit SHA:   493e2f875ec7571d29c67345b6323cdec2fdcb84
+Timestamp (UTC):             2026-09-08T06:00:00+00:00
+Certified Implementation SHA:   72cfecbb30a8358da46a4f7b9a419aea3a3ac883
+Certified Registry Commit SHA: 493e2f875ec7571d29c67345b6323cdec2fdcb84
+Current Documentation Commit:   feat(governance): apply 22-point rigor reconciliation, exception hardening, and proxy disclosures (04b3b1f)
 Parent Commit SHA:           515941c9757849dad1f22252203c0c1d8e9e4b54
 Branch:                      main
-Remote Repository:           https://github.com/ak-bharadwaj/resq-mlops.git (PUBLIC)
+Remote Repository:           https://github.com/ak-bharadwaj/resq-mlops.git (PRIVATE until hand-in deadline; flip to PUBLIC on submission)
 Operating System:            Windows 11 / win32
 Python Interpreter:          C:\Users\dorni\AppData\Local\Python\pythoncore-3.14-64\python.exe (Python 3.14.5)
 Test Framework:              pytest 9.0.3, hypothesis 6.165.9, schemathesis 4.24.3
@@ -86,7 +87,8 @@ restored, empirically tested, and proven with zero unapproved deviations:
 8. Area 8 (Walkthrough Recording Deliverable & Cue-Sheet):
    - Created docs/recording/WALKTHROUGH_SCRIPT.md with verbatim 8-minute spoken script
      and screen action cue-sheet in the Operations Manager register (0:00 to 8:00 breakdown).
-   - Documented submission deliverable video file docs/recording/walkthrough.mp4.
+   - Classified docs/recording/WALKTHROUGH_SCRIPT.md as repository evidence, and
+     walkthrough.mp4 as external video deliverable submitted per Challenge Brief Part 1 Section 7.
 
 9. Area 9 (Canonical Fixture Staging via Promotion Machinery & Audit Trail Provenance):
    - Rollback demonstration staged via authoritative promotion machinery:
@@ -252,6 +254,19 @@ Candidate Lifecycle Status: REJECTED (REJECT_GROUPED_DISAGREEMENT)
 Promotion Audit Result:     71 -> 60 missed broken weeks on temporal windows (15.49% delta),
                             but 17 -> 18 missed broken weeks on unseen grouped holdout.
                             Promotion gate failed closed; production preserved on v0001.
+Empirical Proxy Disclosure: All reported figures were dynamically recomputed from the supplied data;
+                            the field-visit evaluation is explicitly treated as a selection-biased
+                            retrospective proxy. The 71 -> 60 metric is an internal retrospective
+                            COST_BACKTEST proxy on development periods, NOT official fleet ground truth.
+Lifecycle Fault Injections: 8 targeted fault-injection scenarios passed with fail-closed semantics.
+Meter-Read Evidence:        Most recent available pre-cutoff week: 2026-01-26 (meter_read_success.csv ends
+                            on 2026-01-26; no 2026-02-02 meter data exists), showing an 18.76 percentage-point
+                            lower mean meter-read success among the selected gateways (66.87% vs 85.63%).
+Hardware Distribution:      Model GW-8800X accounts for 1 gateway, 5 field visits, 3 confirmed repairs
+                            (never described as 300% repair rate).
+Engineer Review Sample:     27 of the 120 dispatched gateways were independently reviewed in the audit cohort
+                            (engineer_review_2026-02.xlsx); 12 Schlecht (confirmed hardware defect) +
+                            3 nach Tausch stabil (recent physical replacement) = 15 / 27 = 55.6% of the reviewed subset.
 
 Artifact Hashes (model.joblib + model_config.json + feature_schema.json + scorer_identity.txt):
 - models/v0001/manifest.json:
