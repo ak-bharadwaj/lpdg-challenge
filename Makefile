@@ -2,7 +2,7 @@
 
 PYTHON ?= python
 
-.PHONY: help run train predict promote rollback test drift clean frontend ops-status ops-preflight ops-live ops-evaluate ops-promote ops-rollback ops-verify ops-demo ops-snapshot ops-restore
+.PHONY: help run train predict promote rollback test drift clean frontend ops-status ops-preflight ops-live ops-evaluate ops-promote ops-rollback ops-verify ops-demo ops-snapshot ops-restore ops-change ops-rollback-to
 
 DATA ?= ./data
 LIVE_DATA ?= $(DATA)
@@ -33,6 +33,8 @@ help:
 	@echo "  make ops-demo      - Orchestrated 8-step live session demonstration"
 	@echo "  make ops-snapshot  - Export read-only certified baseline registry snapshot"
 	@echo "  make ops-restore   - Safely restore registry state from exported snapshot"
+	@echo "  make ops-change    - Live evaluator model change through authoritative gate (CANDIDATE=...)"
+	@echo "  make ops-rollback-to - Live evaluator atomic rollback to target version (VERSION=...)"
 
 run:
 	$(PYTHON) scripts/make_submission.py --data ./data
@@ -87,5 +89,11 @@ ops-snapshot:
 
 ops-restore:
 	$(PYTHON) scripts/ops.py restore-snapshot --from $(SNAPSHOT)
+
+ops-change:
+	$(PYTHON) scripts/ops.py change --candidate $(CANDIDATE) --data $(LIVE_DATA) $(if $(LIVE_WEEK),--week $(LIVE_WEEK),) --yes
+
+ops-rollback-to:
+	$(PYTHON) scripts/ops.py rollback-to --version $(if $(VERSION),$(VERSION),$(if $(TARGET),$(TARGET),v0001)) --data $(LIVE_DATA) $(if $(LIVE_WEEK),--week $(LIVE_WEEK),)
 
 

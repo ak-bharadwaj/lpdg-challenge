@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import pathlib
 import pytest
@@ -28,14 +29,18 @@ from app.registry.promotion import evaluate_promotion_policy
 from app.registry.rollback import execute_rollback
 from scripts.ops import (
     build_parser,
+    cmd_change,
     cmd_demo,
     cmd_evaluate,
     cmd_preflight,
     cmd_promote,
+    cmd_restore_snapshot,
     cmd_rollback,
+    cmd_rollback_to,
     cmd_run_live,
     cmd_status,
     cmd_verify,
+    get_git_commit,
     run_evaluation,
     run_preflight,
     run_status,
@@ -595,5 +600,458 @@ def test_promote_with_unseen_month_data_directory(tmp_path: pathlib.Path):
     ret = cmd_promote(args)
     # Return code must be 1 (rejection enforced)
     assert ret == 1
+
+
+# ==============================================================================
+# 14. SNAPSHOT AND RESTORE SAFETY CONTRACT TESTS
+# ==============================================================================
+
+def test_snapshot_is_read_only(tmp_path: pathlib.Path):
+    """Safety Invariant: Verify snapshot export is read-only and binds cryptographic contract."""
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+    snapshot_file = tmp_path / "snapshot.json"
+
+    orig_reg_data = json.dumps(
+        {"production_version": "v0001", "previous_version": None, "changed_at": "2026-09-05T00:00:00Z"},
+        indent=2,
+    )
+    reg_file.write_text(orig_reg_data, encoding="utf-8")
+    orig_hist_data = '{"event": "INITIALIZED", "version": "v0001", "timestamp": "2026-09-05T00:00:00Z"}\n'
+    hist_file.write_text(orig_hist_data, encoding="utf-8")
+
+    args = argparse.Namespace(
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+        export=snapshot_file,
+    )
+    ret = cmd_status(args)
+    assert ret == 0
+    assert snapshot_file.exists()
+
+    # Verify registry and history were not modified
+    assert reg_file.read_text(encoding="utf-8") == orig_reg_data
+    assert hist_file.read_text(encoding="utf-8") == orig_hist_data
+
+    # Verify snapshot content contains required cryptographic binding contract
+    snapshot_data = json.loads(snapshot_file.read_text(encoding="utf-8"))
+    assert snapshot_data["production_version"] == "v0001"
+    assert snapshot_data["active_model"] == "v0001"
+    assert snapshot_data["artifact_hash"].startswith("sha256:")
+    assert snapshot_data["active_sha256"] is not None
+    assert snapshot_data["active_sha256"] == hashlib.sha256(orig_reg_data.encode("utf-8")).hexdigest()
+    assert snapshot_data["history_sha256"] == hashlib.sha256(orig_hist_data.encode("utf-8")).hexdigest()
+
+
+def test_restore_valid_certified_snapshot_restores_exact_state(tmp_path: pathlib.Path):
+    """Safety Invariant: Verify restoring certified snapshot restores exact state byte-for-byte."""
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+    snapshot_file = tmp_path / "snapshot.json"
+
+    init_active = json.dumps(
+        {"production_version": "v0001", "previous_version": "v_promotable", "changed_at": "2026-09-06T00:00:00Z"},
+        indent=2,
+    )
+    reg_file.write_text(init_active, encoding="utf-8")
+    init_hist = '{"event": "INITIALIZED", "version": "v0001"}\n'
+    hist_file.write_text(init_hist, encoding="utf-8")
+
+    # Export snapshot
+    args_export = argparse.Namespace(
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+        export=snapshot_file,
+    )
+    assert cmd_status(args_export) == 0
+
+    # Mutate registry to simulate live session mutation
+    reg_file.write_text(json.dumps({"production_version": "v_promotable", "previous_version": "v0001"}), encoding="utf-8")
+    hist_file.write_text(init_hist + '{"event": "PROMOTED", "version": "v_promotable"}\n', encoding="utf-8")
+
+    # Restore snapshot
+    args_restore = argparse.Namespace(
+        from_snapshot=snapshot_file,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+    )
+    assert cmd_restore_snapshot(args_restore) == 0
+
+    # Verify bit-for-bit exact restoration
+    assert reg_file.read_text(encoding="utf-8") == init_active
+    assert hist_file.read_text(encoding="utf-8") == init_hist
+
+
+def test_restore_bad_snapshot_rejected(tmp_path: pathlib.Path):
+    """Safety Invariant: Verify corrupted/tampered snapshot fails closed without mutating registry."""
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+    snapshot_file = tmp_path / "snapshot.json"
+
+    orig_active = json.dumps({"production_version": "v0001", "previous_version": None}, indent=2)
+    orig_hist = '{"event": "INITIALIZED", "version": "v0001"}\n'
+    reg_file.write_text(orig_active, encoding="utf-8")
+    hist_file.write_text(orig_hist, encoding="utf-8")
+
+    # Export valid snapshot
+    args_export = argparse.Namespace(
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+        export=snapshot_file,
+    )
+    assert cmd_status(args_export) == 0
+    valid_data = json.loads(snapshot_file.read_text(encoding="utf-8"))
+
+    # Case A: Corrupted active_sha256
+    bad_a = snapshot_file.with_name("bad_a.json")
+    data_a = dict(valid_data)
+    data_a["active_sha256"] = "corrupted_hash_00000000000000000000000000000000000000000000000000000000"
+    bad_a.write_text(json.dumps(data_a), encoding="utf-8")
+    args_a = argparse.Namespace(from_snapshot=bad_a, registry=reg_file, history=hist_file, models_dir=pathlib.Path("models"))
+    assert cmd_restore_snapshot(args_a) != 0
+    assert reg_file.read_text(encoding="utf-8") == orig_active
+
+    # Case B: Tampered active_content (mismatched with active_sha256)
+    bad_b = snapshot_file.with_name("bad_b.json")
+    data_b = dict(valid_data)
+    data_b["active_content"] = json.dumps({"production_version": "v0002"})
+    bad_b.write_text(json.dumps(data_b), encoding="utf-8")
+    args_b = argparse.Namespace(from_snapshot=bad_b, registry=reg_file, history=hist_file, models_dir=pathlib.Path("models"))
+    assert cmd_restore_snapshot(args_b) != 0
+    assert reg_file.read_text(encoding="utf-8") == orig_active
+
+    # Case C: Tampered production_version in active_content vs snapshot binding
+    bad_c = snapshot_file.with_name("bad_c.json")
+    tampered_content = json.dumps({"production_version": "v_tampered"})
+    data_c = dict(valid_data)
+    data_c["active_content"] = tampered_content
+    data_c["active_sha256"] = hashlib.sha256(tampered_content.encode("utf-8")).hexdigest()
+    data_c["production_version"] = "v0001"
+    bad_c.write_text(json.dumps(data_c), encoding="utf-8")
+    args_c = argparse.Namespace(from_snapshot=bad_c, registry=reg_file, history=hist_file, models_dir=pathlib.Path("models"))
+    assert cmd_restore_snapshot(args_c) != 0
+    assert reg_file.read_text(encoding="utf-8") == orig_active
+
+    # Case D: Corrupted history_sha256
+    bad_d = snapshot_file.with_name("bad_d.json")
+    data_d = dict(valid_data)
+    data_d["history_sha256"] = "mismatched_history_sha"
+    bad_d.write_text(json.dumps(data_d), encoding="utf-8")
+    args_d = argparse.Namespace(from_snapshot=bad_d, registry=reg_file, history=hist_file, models_dir=pathlib.Path("models"))
+    assert cmd_restore_snapshot(args_d) != 0
+    assert reg_file.read_text(encoding="utf-8") == orig_active
+
+    # Case E: Git commit mismatch (when current git HEAD is known)
+    curr_commit = get_git_commit()
+    if curr_commit != "UNKNOWN":
+        bad_e = snapshot_file.with_name("bad_e.json")
+        data_e = dict(valid_data)
+        data_e["git_commit"] = "deadbeef00000000000000000000000000000000"
+        bad_e.write_text(json.dumps(data_e), encoding="utf-8")
+        args_e = argparse.Namespace(from_snapshot=bad_e, registry=reg_file, history=hist_file, models_dir=pathlib.Path("models"))
+        assert cmd_restore_snapshot(args_e) != 0
+        assert reg_file.read_text(encoding="utf-8") == orig_active
+
+
+def test_restore_wrong_artifact_hash_rejected(tmp_path: pathlib.Path):
+    """Safety Invariant: Verify snapshot with wrong artifact hash fails closed and preserves registry."""
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+    snapshot_file = tmp_path / "snapshot.json"
+
+    orig_active = json.dumps({"production_version": "v0001", "previous_version": None}, indent=2)
+    reg_file.write_text(orig_active, encoding="utf-8")
+    hist_file.write_text('{"event": "INITIALIZED", "version": "v0001"}\n', encoding="utf-8")
+
+    args_export = argparse.Namespace(
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+        export=snapshot_file,
+    )
+    assert cmd_status(args_export) == 0
+
+    # Tamper with snapshot artifact_hash
+    data = json.loads(snapshot_file.read_text(encoding="utf-8"))
+    data["artifact_hash"] = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    snapshot_file.write_text(json.dumps(data), encoding="utf-8")
+
+    # Mutate registry state before attempting restore
+    reg_file.write_text(json.dumps({"production_version": "v_mutated"}), encoding="utf-8")
+
+    args_restore = argparse.Namespace(
+        from_snapshot=snapshot_file,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+    )
+    ret = cmd_restore_snapshot(args_restore)
+    assert ret != 0, "Restore must fail closed when artifact hash does not match target model"
+    assert json.loads(reg_file.read_text(encoding="utf-8"))["production_version"] == "v_mutated"
+
+
+def test_restore_does_not_touch_model_artifacts(tmp_path: pathlib.Path):
+    """Safety Invariant: Verify restoring snapshot never touches, mutates, or rewires files in models/."""
+    models_dir = pathlib.Path("models")
+    v1_dir = models_dir / "v0001"
+
+    # Record hashes and mtimes of all files in models/v0001
+    file_state_before = {}
+    for f in v1_dir.iterdir():
+        if f.is_file():
+            file_state_before[f.name] = (f.stat().st_mtime, hashlib.sha256(f.read_bytes()).hexdigest())
+
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+    snapshot_file = tmp_path / "snapshot.json"
+
+    reg_file.write_text(json.dumps({"production_version": "v0001", "previous_version": None}, indent=2), encoding="utf-8")
+    hist_file.write_text('{"event": "INITIALIZED", "version": "v0001"}\n', encoding="utf-8")
+
+    args_export = argparse.Namespace(
+        registry=reg_file,
+        history=hist_file,
+        models_dir=models_dir,
+        export=snapshot_file,
+    )
+    assert cmd_status(args_export) == 0
+
+    # Mutate registry
+    reg_file.write_text(json.dumps({"production_version": "v_promotable"}), encoding="utf-8")
+
+    # Restore snapshot
+    args_restore = argparse.Namespace(
+        from_snapshot=snapshot_file,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=models_dir,
+    )
+    assert cmd_restore_snapshot(args_restore) == 0
+
+    # Verify every file in models/v0001 is completely untouched
+    for fname, (orig_mtime, orig_hash) in file_state_before.items():
+        curr_path = v1_dir / fname
+        assert curr_path.stat().st_mtime == orig_mtime, f"Model file {fname} mtime was modified!"
+        assert hashlib.sha256(curr_path.read_bytes()).hexdigest() == orig_hash, f"Model file {fname} content changed!"
+
+
+# ==============================================================================
+# 15. HIGH-LEVEL OPERATOR FEATURE TESTS (change & rollback-to)
+# ==============================================================================
+
+def test_change_rejected_keeps_active(tmp_path: pathlib.Path, repo_data_dir: pathlib.Path):
+    """Verify change command on rejected candidate (v0002) exits non-zero and keeps active unchanged."""
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+
+    orig_active = json.dumps({"production_version": "v0001", "previous_version": None, "changed_at": "2026-09-05T00:00:00Z"}, indent=2)
+    reg_file.write_text(orig_active, encoding="utf-8")
+    orig_hist = '{"event": "INITIALIZED", "version": "v0001", "timestamp": "2026-09-05T00:00:00Z"}\n'
+    hist_file.write_text(orig_hist, encoding="utf-8")
+
+    args = argparse.Namespace(
+        candidate="v0002",
+        data=repo_data_dir,
+        week="2026-02-02",
+        policy=pathlib.Path("policy.json"),
+        yes=True,
+        dry_run=False,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+    )
+
+    ret = cmd_change(args)
+    assert ret == 1, "cmd_change on rejected candidate must deliberately exit with non-zero code 1"
+    assert reg_file.read_text(encoding="utf-8") == orig_active, "Active pointer was mutated on rejection"
+    assert hist_file.read_text(encoding="utf-8") == orig_hist, "History was appended on rejection"
+
+
+def test_change_promotes_through_existing_gate(tmp_path: pathlib.Path, repo_data_dir: pathlib.Path):
+    """Verify change command promotes validated candidate through existing promotion gate."""
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+
+    reg_file.write_text(
+        json.dumps({"production_version": "v0001", "previous_version": None, "changed_at": "2026-09-05T00:00:00Z"}, indent=2),
+        encoding="utf-8",
+    )
+    hist_file.write_text(
+        json.dumps({"event": "INITIALIZED", "version": "v0001", "timestamp": "2026-09-05T00:00:00Z"}) + "\n",
+        encoding="utf-8",
+    )
+
+    args = argparse.Namespace(
+        candidate="v_promotable",
+        data=repo_data_dir,
+        week="2026-02-02",
+        policy=pathlib.Path("policy.json"),
+        yes=True,
+        dry_run=False,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+    )
+
+    ret = cmd_change(args)
+    assert ret == 0, "cmd_change should succeed for v_promotable with --yes"
+
+    updated = json.loads(reg_file.read_text(encoding="utf-8"))
+    assert updated["production_version"] == "v_promotable"
+    assert updated["previous_version"] == "v0001"
+
+    hist_lines = [ln.strip() for ln in hist_file.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    assert len(hist_lines) == 2
+    last_event = json.loads(hist_lines[-1])
+    assert last_event["event"] == "PROMOTED"
+    assert last_event["version"] == "v_promotable"
+
+
+def test_change_dry_run_is_read_only(tmp_path: pathlib.Path, repo_data_dir: pathlib.Path):
+    """Verify change command with --dry-run evaluates candidate but leaves active registry untouched."""
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+
+    orig_active = json.dumps({"production_version": "v0001", "previous_version": None, "changed_at": "2026-09-05T00:00:00Z"}, indent=2)
+    reg_file.write_text(orig_active, encoding="utf-8")
+    orig_hist = '{"event": "INITIALIZED", "version": "v0001", "timestamp": "2026-09-05T00:00:00Z"}\n'
+    hist_file.write_text(orig_hist, encoding="utf-8")
+
+    args = argparse.Namespace(
+        candidate="v_promotable",
+        data=repo_data_dir,
+        week="2026-02-02",
+        policy=pathlib.Path("policy.json"),
+        yes=True,
+        dry_run=True,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+    )
+
+    ret = cmd_change(args)
+    assert ret == 0
+    assert reg_file.read_text(encoding="utf-8") == orig_active, "--dry-run mutated registry/active.json"
+    assert hist_file.read_text(encoding="utf-8") == orig_hist, "--dry-run mutated registry/history.jsonl"
+
+
+def test_rollback_to_restores_previous(tmp_path: pathlib.Path, repo_data_dir: pathlib.Path):
+    """Verify rollback-to command wraps existing rollback engine and restores previous model."""
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+
+    reg_file.write_text(
+        json.dumps({"production_version": "v_promotable", "previous_version": "v0001", "changed_at": "2026-09-05T00:00:00Z"}, indent=2),
+        encoding="utf-8",
+    )
+    hist_file.write_text(
+        json.dumps({"event": "PROMOTED", "version": "v_promotable", "previous_version": "v0001", "timestamp": "2026-09-05T00:00:00Z"}) + "\n",
+        encoding="utf-8",
+    )
+
+    args = argparse.Namespace(
+        version="v0001",
+        to="v0001",
+        data=repo_data_dir,
+        week="2026-02-02",
+        expected_hash=None,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+    )
+
+    ret = cmd_rollback_to(args)
+    assert ret == 0, "cmd_rollback_to failed"
+
+    updated = json.loads(reg_file.read_text(encoding="utf-8"))
+    assert updated["production_version"] == "v0001"
+    assert updated["previous_version"] == "v_promotable"
+
+    hist_lines = [ln.strip() for ln in hist_file.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    assert len(hist_lines) == 2
+    last_event = json.loads(hist_lines[-1])
+    assert last_event["event"] == "ROLLED_BACK"
+    assert last_event["to"] == "v0001"
+
+
+def test_change_then_rollback_replays_identically(tmp_path: pathlib.Path, repo_data_dir: pathlib.Path):
+    """Verify round-trip: change active model to v_promotable then rollback-to v0001 reproduces identical replay hash."""
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+
+    reg_file.write_text(
+        json.dumps({"production_version": "v0001", "previous_version": None, "changed_at": "2026-09-05T00:00:00Z"}, indent=2),
+        encoding="utf-8",
+    )
+    hist_file.write_text(
+        json.dumps({"event": "INITIALIZED", "version": "v0001", "timestamp": "2026-09-05T00:00:00Z"}) + "\n",
+        encoding="utf-8",
+    )
+
+    # 1. Baseline prediction on v0001
+    baseline_pred = predict_week(
+        data_dir=repo_data_dir,
+        week_start="2026-02-02",
+        registry_path=reg_file,
+        models_dir=pathlib.Path("models"),
+    )
+    initial_replay_hash = baseline_pred["replay_hash"]
+
+    # 2. Promote candidate v_promotable via ops-change
+    args_change = argparse.Namespace(
+        candidate="v_promotable",
+        data=repo_data_dir,
+        week="2026-02-02",
+        policy=pathlib.Path("policy.json"),
+        yes=True,
+        dry_run=False,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+    )
+    assert cmd_change(args_change) == 0
+
+    promoted_pred = predict_week(
+        data_dir=repo_data_dir,
+        week_start="2026-02-02",
+        registry_path=reg_file,
+        models_dir=pathlib.Path("models"),
+    )
+    assert promoted_pred["active_version"] == "v_promotable"
+    assert promoted_pred["replay_hash"] != initial_replay_hash
+
+    # 3. Rollback to v0001 via ops-rollback-to with expected hash proof
+    args_rollback = argparse.Namespace(
+        version="v0001",
+        to="v0001",
+        data=repo_data_dir,
+        week="2026-02-02",
+        expected_hash=initial_replay_hash,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+    )
+    assert cmd_rollback_to(args_rollback) == 0
+
+    # 4. Predict week on restored model
+    restored_pred = predict_week(
+        data_dir=repo_data_dir,
+        week_start="2026-02-02",
+        registry_path=reg_file,
+        models_dir=pathlib.Path("models"),
+    )
+    assert restored_pred["active_version"] == "v0001"
+    assert restored_pred["replay_hash"] == initial_replay_hash, "Replay hash mismatch after round-trip rollback!"
+
+
+def test_change_has_no_force_option():
+    """Safety Invariant: Verify change CLI strictly forbids any --force argument."""
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["change", "--candidate", "v0002", "--force"])
 
 

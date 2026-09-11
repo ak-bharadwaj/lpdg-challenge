@@ -17,25 +17,34 @@ This guide documents the authoritative execution sequence for live evaluation se
    - Gateway IDs never seen during training (`AA0000000001`).
    - Gateways with established history that go completely silent in the live month (`0639EA000002`).
    - Canonical telemetry schema compliance without pipeline crashes.
-3. **Certified Baseline vs. Live Mutation**:
+3. **Primary Live Operator Shortcuts**:
+   For live demonstration sessions, use the high-level orchestration shortcuts `ops-change` and `ops-rollback-to`. Lower-level commands (`ops-evaluate`, `ops-promote`, `ops-rollback`) are preserved for granular diagnostic investigations.
+4. **Certified Baseline vs. Live Mutation**:
    - **During the live session**: Registry pointer transitions (`active.json`) and audit trail appends (`history.jsonl`) are **expected and desirable** to demonstrate atomic promotion, candidate rejection enforcement, and compensating rollback.
-   - **Before/After the session**: The repository baseline is protected via a read-only snapshot export (`make ops-snapshot`) and safe restoration (`make ops-restore`), eliminating reliance on arbitrary `git checkout`.
+   - **Before/After the rehearsal**: The repository baseline is protected via a cryptographically bound read-only snapshot export (`make ops-snapshot`) and safe restoration (`make ops-restore`).
 
 ---
 
 ## 2. Certified Baseline Snapshot (Pre-Session)
 
-Before launching the live session, record the certified baseline state (active model `v0001`):
+Before launching the live rehearsal, record the certified baseline state (active model `v0001`):
 
 ```bash
-# Export read-only certified baseline snapshot
+# Export read-only certified baseline snapshot with cryptographic bindings
 make ops-snapshot
 # Outputs: Snapshot exported to: registry_certified_baseline.json
 ```
 
+The exported snapshot cryptographically binds to:
+- `production_version` (`v0001`)
+- `artifact_hash` (SHA-256 of active model package)
+- repository Git commit SHA
+- `active.json` SHA-256 digest
+- `history.jsonl` SHA-256 digest
+
 ---
 
-## 3. Step-by-Step Live Evaluator Demonstration Sequence
+## 3. Primary Live Evaluator Demonstration Sequence
 
 Configure the session environment variables pointing to the evaluator's unseen dataset:
 
@@ -43,6 +52,21 @@ Configure the session environment variables pointing to the evaluator's unseen d
 LIVE_DATA="/path/to/evaluator_unseen_month"
 LIVE_WEEK="2026-05-04"  # Replace with the evaluator's designated Monday week
 ```
+
+The live evaluator's primary sequence is:
+
+```bash
+make ops-status
+make ops-preflight LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-change CANDIDATE=v0002 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-change CANDIDATE=v_promotable LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-rollback-to VERSION=v0001 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-verify LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK" TARGET=v0001
+```
+
+---
 
 ### Step 1: Operator Status Summary (Read-Only)
 Inspect the active model pointer, artifact hash integrity, and registry status:
@@ -54,6 +78,7 @@ make ops-status
 - Artifact integrity: `PASS`
 - Registry: `PASS`
 - Schema contract: `PASS`
+- Git tree: `CLEAN`
 
 ---
 
@@ -67,7 +92,7 @@ make ops-preflight LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
 
 ---
 
-### Step 3: Run Live Prediction with Active Model (`v0001`)
+### Step 3: Run Live Prediction with Baseline Model (`v0001`)
 Generate top-15 dispatches for the unseen week using the frozen active production model:
 ```bash
 make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
@@ -76,51 +101,42 @@ make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
 - Active model: `v0001`
 - Eligible gateways inspected
 - Selected: 15 dispatches
-- Replay hash: SHA256 provenance generated
+- Replay hash: Provenance SHA-256 generated
 - Status: `PASS`
 
 ---
 
-### Step 4: Evaluate Candidate Model (`v0002`) Against Promotion Policy
-Evaluate experimental candidate `v0002` across multi-window temporal backtests and the 59-gateway grouped holdout:
+### Step 4: Deliberate Negative Test: Model Change Attempt on Rejected Candidate (`v0002`)
+Prove that attempting to change production to candidate `v0002` triggers the frozen promotion policy, fails closed, and leaves production unchanged:
 ```bash
-make ops-evaluate CANDIDATE=v0002
+make ops-change CANDIDATE=v0002 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+# Or equivalent lower-level command:
+# python scripts/ops.py promote --candidate v0002 --data "$LIVE_DATA" --yes
 ```
-*Expected Output:*
-- Rolling evidence: Nov (+6), Dec (+4), Jan (+1)
-- Grouped evidence: 17 active vs 18 candidate (diff: -1, DISAGREED)
-- Aggregate result: 71 vs 60 (+15.49% improvement)
+*Expected Result:*
 - Decision: `REJECT (REJECT_GROUPED_DISAGREEMENT)`
-- Production state: `UNCHANGED`
+- Production state: `UNCHANGED (registry/active.json remains on v0001)`
+- Expected result: `REJECT` / exit code `1`.
+- **Note**: This non-zero exit is intentional and is not a rehearsal failure. It proves that production is protected against unvetted candidates.
 
 ---
 
-### Step 5: Verify That Promotion Gate Strictly Blocks Rejected Candidate
-Prove that attempting to promote rejected candidate `v0002` fails closed and does not mutate production:
+### Step 5: High-Level Model Change with Validated Candidate (`v_promotable`)
+Orchestrate end-to-end model change through the authoritative lifecycle (preflight -> candidate validation -> gate evaluation -> confirmation -> atomic promotion -> post-verification):
 ```bash
-python scripts/ops.py promote --candidate v0002 --data "$LIVE_DATA" --yes
-```
-*Expected Output:*
-- `REJECTION ENFORCED: Candidate v0002 was REJECTED (REJECT_GROUPED_DISAGREEMENT)`
-- `Production state: UNCHANGED (registry/active.json remains on v0001)`
-- Exit code: `1`
-
----
-
-### Step 6: Atomically Promote Validated Demonstration Fixture (`v_promotable`)
-Demonstrate successful atomic promotion using the committed, pre-validated demonstration fixture:
-```bash
-make ops-promote CANDIDATE=v_promotable DATA="$LIVE_DATA"
+make ops-change CANDIDATE=v_promotable LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
 ```
 *Expected Output:*
 - Candidate validation: `PASS`
-- Decision: `PROMOTE`
-- Atomic switch: `active.json` updated to `v_promotable`
-- History appended: `PROMOTED` event recorded
+- Gate decision: `PROMOTE`
+- Transition: `v0001 -> v_promotable`
+- Post-verification: `PASS (15 dispatches scored)`
+- Audit event: `PROMOTED` appended to `registry/history.jsonl`
+- Exit code: `0`
 
 ---
 
-### Step 7: Live Prediction with Promoted Active Model
+### Step 6: Live Prediction with Changed Active Model
 Execute live prediction on the evaluator's unseen week under the new active model, proving operational score changes:
 ```bash
 make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
@@ -131,21 +147,22 @@ make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
 
 ---
 
-### Step 8: Execute Atomic Rollback to Baseline Model (`v0001`)
-Execute atomic rollback with automated replay equality verification:
+### Step 7: Atomic Rollback to Baseline Model (`v0001`)
+Execute atomic rollback wrapping the existing rollback engine with automated 7-step replay equality verification:
 ```bash
-make ops-rollback TARGET=v0001 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-rollback-to VERSION=v0001 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
 ```
 *Expected Output:*
 - Target validation: `PASS`
 - Atomic switch: `PASS`
 - Replay equality: `PASS`
 - Active model: `v0001` restored
+- Audit event: `ROLLED_BACK` appended to `registry/history.jsonl`
 - Status: `PASS`
 
 ---
 
-### Step 9: Replay Verification & Bit-for-Bit Determinism Proof
+### Step 8: Replay Verification & Bit-for-Bit Determinism Proof
 Verify that restored model `v0001` reproduces bit-for-bit identical outputs on the unseen week:
 ```bash
 make ops-verify LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK" TARGET=v0001
@@ -158,22 +175,40 @@ make ops-verify LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK" TARGET=v0001
 
 ---
 
-## 4. Post-Session Certified Baseline Restoration
+## 4. Diagnostic Low-Level Commands Reference
 
-Following the live demonstration, safely restore the certified baseline from the snapshot:
+For deep diagnostic inspections during evaluation or auditing, the lower-level CLI commands remain fully supported:
+
+- **`make ops-evaluate CANDIDATE=<ver>`**: Evaluates candidate multi-window rolling and grouped holdout evidence without modifying any registry state.
+- **`make ops-promote CANDIDATE=<ver>`**: Evaluates promotion gate and performs atomic switch with explicit confirmation prompt.
+- **`make ops-rollback TARGET=<ver>`**: Direct low-level rollback engine execution with replay comparison.
+
+---
+
+## 5. Post-Rehearsal Certified Baseline Restoration vs. Production Rollback
+
+Following the live demonstration, safely restore the repository to the pre-rehearsal certified baseline before hand-in:
 
 ```bash
 make ops-restore
 # Outputs:
-# Registry state safely restored from snapshot: registry_certified_baseline.json
+# Registry state safely restored from certified snapshot: registry_certified_baseline.json
 # Active model restored: v0001
+# Artifact hash verified: ...
+# Model artifacts untouched: verified read-only
 ```
 
 Confirm repository status:
 ```bash
 make ops-status
-git status
 ```
 *Expected Output:*
 - Active model: `v0001`
-- Working tree: `CLEAN`
+- Registry: `PASS`
+- Artifact integrity: `PASS`
+- Git tree: `CLEAN`
+
+### Authoritative Architecture Disclosure:
+> **The rehearsal deliberately restores the repository to the pre-rehearsal certified baseline before hand-in.**
+> 
+> In a real production deployment, a rollback would **never** erase its audit trail. The actual live rollback appends the `ROLLED_BACK` event to `registry/history.jsonl` and preserves that complete audit trail. `registry/active.json` is the authoritative active pointer, while `registry/history.jsonl` is the immutable lifecycle audit evidence.

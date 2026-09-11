@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import hashlib
 import json
 import os
 import pathlib
@@ -68,6 +69,30 @@ def get_git_status() -> str:
         return "UNKNOWN"
     except Exception:
         return "UNKNOWN"
+
+
+def get_git_commit() -> str:
+    """Return HEAD commit hash or UNKNOWN."""
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=str(root_dir),
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.strip()
+        return "UNKNOWN"
+    except Exception:
+        return "UNKNOWN"
+
+
+def compute_content_sha256(content: Optional[str]) -> Optional[str]:
+    """Compute SHA256 hex digest of string content."""
+    if content is None:
+        return None
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 # ==============================================================================
@@ -130,19 +155,24 @@ def run_status(
 
     active_content = registry_path.read_text(encoding="utf-8") if registry_path.exists() else None
     history_content = history_path.read_text(encoding="utf-8") if history_path.exists() else None
+    git_commit = get_git_commit()
 
     return {
         "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
         "active_model": active_model,
+        "production_version": active_model,
         "previous_model": prev_model,
         "artifact_hash": art_hash,
         "registry": "PASS" if reg_ok else "FAIL",
         "artifact_integrity": "PASS" if art_ok else "FAIL",
         "schema_contract": "PASS" if schema_ok else "FAIL",
         "git_tree": git_tree,
+        "git_commit": git_commit,
         "history": history_events,
         "active_content": active_content,
+        "active_sha256": compute_content_sha256(active_content),
         "history_content": history_content,
+        "history_sha256": compute_content_sha256(history_content),
     }
 
 
@@ -163,6 +193,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(f"Artifact integrity: {status['artifact_integrity']}")
     print(f"Schema contract:    {status['schema_contract']}")
     print(f"Git tree:           {status['git_tree']}")
+    print(f"Git commit:         {status.get('git_commit', 'UNKNOWN')}")
 
     if status["history"]:
         print("\nRecent Lifecycle History:")
@@ -183,53 +214,148 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_restore_snapshot(args: argparse.Namespace) -> int:
-    """Safely restore registry state from exported snapshot."""
+    """Safely restore registry state from certified snapshot with cryptographic binding."""
     if not args.from_snapshot.exists():
         print(f"ERROR: Snapshot file does not exist: {args.from_snapshot}", file=sys.stderr)
         return 1
 
     try:
-        data = json.loads(args.from_snapshot.read_text(encoding="utf-8"))
-        active_json_text = data.get("active_content")
-        history_jsonl_text = data.get("history_content")
-        target_version = data.get("active_model", "v0001")
+        raw_text = args.from_snapshot.read_text(encoding="utf-8")
+        data = json.loads(raw_text)
+    except Exception as exc:
+        print(f"ERROR: Invalid snapshot JSON: {exc}", file=sys.stderr)
+        return 1
 
-        if not active_json_text:
-            print("ERROR: Invalid snapshot file: missing active_content", file=sys.stderr)
+    if not isinstance(data, dict):
+        print("ERROR: Invalid snapshot file format: root must be a JSON object", file=sys.stderr)
+        return 1
+
+    # 1. Validate required snapshot fields
+    active_json_text = data.get("active_content")
+    history_jsonl_text = data.get("history_content")
+    target_version = data.get("production_version") or data.get("active_model")
+    snapshot_art_hash = data.get("artifact_hash")
+    expected_active_sha = data.get("active_sha256")
+    expected_history_sha = data.get("history_sha256")
+    snapshot_git = data.get("git_commit")
+
+    if not active_json_text or not isinstance(active_json_text, str):
+        print("ERROR: Invalid snapshot file: missing or invalid active_content", file=sys.stderr)
+        return 1
+
+    if not target_version or target_version == "UNKNOWN":
+        print("ERROR: Invalid snapshot file: missing production_version / active_model", file=sys.stderr)
+        return 1
+
+    if not snapshot_art_hash or snapshot_art_hash == "UNKNOWN":
+        print("ERROR: Invalid snapshot file: missing or UNKNOWN artifact_hash", file=sys.stderr)
+        return 1
+
+    if not expected_active_sha:
+        print("ERROR: Invalid snapshot file: missing active_sha256 cryptographic binding", file=sys.stderr)
+        return 1
+
+    # 2. Cryptographic binding check: active.json SHA256
+    computed_active_sha = hashlib.sha256(active_json_text.encode("utf-8")).hexdigest()
+    if expected_active_sha != computed_active_sha:
+        print(
+            f"ERROR: Cryptographic check failed: active.json SHA256 mismatch "
+            f"(declared {expected_active_sha} != computed {computed_active_sha})",
+            file=sys.stderr,
+        )
+        return 1
+
+    # 3. Structural binding check: active.json content matches target_version
+    try:
+        active_obj = json.loads(active_json_text)
+        if not isinstance(active_obj, dict):
+            print("ERROR: active_content is not a valid JSON object", file=sys.stderr)
+            return 1
+        obj_version = active_obj.get("production_version")
+        if obj_version != target_version:
+            print(
+                f"ERROR: active.json production_version mismatch: "
+                f"content declared '{obj_version}' != snapshot contract '{target_version}'",
+                file=sys.stderr,
+            )
+            return 1
+    except Exception as exc:
+        print(f"ERROR: Failed to parse active_content JSON: {exc}", file=sys.stderr)
+        return 1
+
+    # 4. Cryptographic binding check: history.jsonl SHA256 (if present)
+    if history_jsonl_text is not None and expected_history_sha:
+        computed_hist_sha = hashlib.sha256(history_jsonl_text.encode("utf-8")).hexdigest()
+        if expected_history_sha != computed_hist_sha:
+            print(
+                f"ERROR: Cryptographic check failed: history.jsonl SHA256 mismatch "
+                f"(declared {expected_history_sha} != computed {computed_hist_sha})",
+                file=sys.stderr,
+            )
             return 1
 
-        # Verify target model artifact before restoring
-        target_dir = args.models_dir / target_version
-        if not target_dir.exists() or not target_dir.is_dir():
-            print(f"ERROR: Target model directory {target_dir} does not exist", file=sys.stderr)
+    # 5. Repository git commit check
+    current_git = get_git_commit()
+    if snapshot_git and snapshot_git != "UNKNOWN" and current_git != "UNKNOWN":
+        if snapshot_git != current_git:
+            print(
+                f"ERROR: Repository git SHA mismatch: snapshot created at {snapshot_git} "
+                f"!= current HEAD {current_git}",
+                file=sys.stderr,
+            )
             return 1
 
-        manifest_p = target_dir / "manifest.json"
-        if not manifest_p.exists():
-            print(f"ERROR: Manifest missing for {target_version}", file=sys.stderr)
-            return 1
+    # 6. Target model artifact integrity and hash binding (DOES NOT TOUCH ARTIFACTS)
+    target_dir = args.models_dir / target_version
+    if not target_dir.exists() or not target_dir.is_dir():
+        print(f"ERROR: Target model directory {target_dir} does not exist", file=sys.stderr)
+        return 1
 
+    manifest_p = target_dir / "manifest.json"
+    if not manifest_p.exists():
+        print(f"ERROR: Manifest missing for target version {target_version}: {manifest_p}", file=sys.stderr)
+        return 1
+
+    try:
         manifest = json.loads(manifest_p.read_text(encoding="utf-8"))
         declared_hash = manifest.get("artifact_hash", "")
         computed_hash = compute_artifact_hash(target_dir)
         if declared_hash != computed_hash:
-            print(f"ERROR: Artifact hash mismatch for {target_version}", file=sys.stderr)
+            print(
+                f"ERROR: Manifest artifact hash mismatch for {target_version} "
+                f"('{declared_hash}' != '{computed_hash}')",
+                file=sys.stderr,
+            )
             return 1
+        if snapshot_art_hash != computed_hash:
+            print(
+                f"ERROR: Snapshot bound artifact hash mismatch for {target_version}: "
+                f"snapshot bound '{snapshot_art_hash}' != actual computed '{computed_hash}'",
+                file=sys.stderr,
+            )
+            return 1
+    except Exception as exc:
+        print(f"ERROR: Failed validating target model artifact: {exc}", file=sys.stderr)
+        return 1
 
-        # Atomically restore active.json
+    # 7. Atomic restoration of registry state (DOES NOT TOUCH MODEL ARTIFACTS)
+    try:
+        args.registry.parent.mkdir(parents=True, exist_ok=True)
         tmp_p = args.registry.with_suffix(".tmp")
         tmp_p.write_text(active_json_text, encoding="utf-8")
         tmp_p.replace(args.registry)
 
-        # Restore history.jsonl if present
         if history_jsonl_text is not None:
+            args.history.parent.mkdir(parents=True, exist_ok=True)
             args.history.write_text(history_jsonl_text, encoding="utf-8")
 
-        print(f"Registry state safely restored from snapshot: {args.from_snapshot}")
+        print(f"Registry state safely restored from certified snapshot: {args.from_snapshot}")
         print(f"Active model restored: {target_version}")
+        print(f"Artifact hash verified: {computed_hash}")
+        print("Model artifacts untouched: verified read-only")
         return 0
     except Exception as exc:
-        print(f"ERROR: Failed to restore snapshot: {exc}", file=sys.stderr)
+        print(f"ERROR: Failed to restore registry state: {exc}", file=sys.stderr)
         return 1
 
 
@@ -682,6 +808,151 @@ def cmd_promote(args: argparse.Namespace) -> int:
 
 
 # ==============================================================================
+# COMMAND: change (Primary Live Operator Shortcut)
+# ==============================================================================
+
+def cmd_change(args: argparse.Namespace) -> int:
+    """Execute high-level authoritative model change lifecycle.
+
+    Primary live-session command for model transitions. Orchestrates ONLY:
+      preflight
+      -> candidate validation / evaluation
+      -> frozen promotion policy
+      -> explicit confirmation (unless --yes)
+      -> existing promote_candidate()
+      -> existing post-promotion verification
+      -> concise audit / result output
+    """
+    if not args.data.exists() or not args.data.is_dir():
+        print(f"ERROR: Specified data directory does not exist: {args.data}", file=sys.stderr)
+        return 1
+
+    # 1. Preflight safety check
+    pf_passed, pf_errors = run_preflight(
+        data_dir=args.data,
+        week=args.week,
+        registry_path=args.registry,
+        models_dir=args.models_dir,
+    )
+    if not pf_passed:
+        print("PREFLIGHT CHECK: FAIL", file=sys.stderr)
+        for err in pf_errors:
+            print(f"  - {err}", file=sys.stderr)
+        return 1
+
+    try:
+        active_version_before = resolve_active_model_version(args.registry)
+    except Exception as exc:
+        print(f"ERROR: Failed to resolve active model from registry: {exc}", file=sys.stderr)
+        return 1
+
+    # 2. Candidate validation
+    try:
+        val_info = validate_rollback_target(
+            target_version=args.candidate,
+            models_dir=args.models_dir,
+            data_dir=args.data,
+            test_date=args.week,
+        )
+        cand_artifact_hash = val_info["artifact_hash"]
+    except Exception as exc:
+        print(f"ERROR: Candidate validation failed for {args.candidate}: {exc}", file=sys.stderr)
+        return 1
+
+    # 3. Candidate evaluation against frozen promotion policy
+    try:
+        report, decision = run_evaluation(
+            candidate_version=args.candidate,
+            data_dir=args.data,
+            active_version=active_version_before,
+            policy_path=args.policy,
+            registry_path=args.registry,
+        )
+    except Exception as exc:
+        print(f"ERROR: Candidate evaluation failed: {exc}", file=sys.stderr)
+        return 1
+
+    print("=" * 70)
+    print("OPERATOR CHANGE REQUEST")
+    print("=" * 70)
+    print(f"Active version:     {active_version_before}")
+    print(f"Candidate version:  {args.candidate}")
+    print(f"Candidate artifact: {cand_artifact_hash}")
+    print(f"Gate decision:      {decision.decision} ({decision.reason_code})")
+    print(f"Explanation:        {decision.explanation}")
+    print("-" * 70)
+
+    # 4. Handle Rejection (deliberate non-zero exit, safety outcome)
+    if decision.decision != "PROMOTE":
+        active_after = resolve_active_model_version(args.registry)
+        assert active_after == active_version_before, "Safety violation: active version mutated on rejection!"
+        print(f"SAFETY GATE ENFORCED: Candidate {args.candidate} was REJECTED ({decision.reason_code}).")
+        print(f"Active model remains unchanged: {active_after}")
+        print("This non-zero exit is intentional and represents a successful safety outcome.")
+        print("=" * 70)
+        return 1
+
+    # 5. Handle Dry Run
+    if args.dry_run:
+        active_after = resolve_active_model_version(args.registry)
+        assert active_after == active_version_before, "Safety violation: dry-run mutated active version!"
+        print(f"DRY RUN: Candidate {args.candidate} passed promotion gate, but production state was not updated (--dry-run).")
+        print(f"Production state: UNCHANGED ({args.registry} remains on {active_version_before}).")
+        print("=" * 70)
+        return 0
+
+    # 6. Explicit confirmation unless --yes
+    if not args.yes:
+        try:
+            confirm = input(f"Confirm promotion of candidate {args.candidate} to replace active {active_version_before}? [y/N]: ").strip().lower()
+        except EOFError:
+            confirm = "no"
+        if confirm not in ("y", "yes"):
+            print("Model change cancelled by operator. Production state: UNCHANGED.")
+            print("=" * 70)
+            return 0
+
+    # 7. Execute promotion via existing promote_candidate()
+    timestamp_utc = dt.datetime.now(dt.timezone.utc).isoformat()
+    try:
+        promote_candidate(
+            candidate_version=args.candidate,
+            decision=decision,
+            registry_path=args.registry,
+            history_path=args.history,
+            timestamp_utc=timestamp_utc,
+        )
+    except Exception as exc:
+        print(f"ERROR: Promotion execution failed: {exc}", file=sys.stderr)
+        return 1
+
+    # 8. Post-promotion verification
+    try:
+        post_pred = predict_week(
+            data_dir=args.data,
+            week_start=args.week,
+            registry_path=args.registry,
+            models_dir=args.models_dir,
+        )
+        post_version = resolve_active_model_version(args.registry)
+        assert post_version == args.candidate, f"Registry mismatch: expected {args.candidate}, got {post_version}"
+        assert len(post_pred["predictions"]) == 15, f"Expected 15 predictions, got {len(post_pred['predictions'])}"
+    except Exception as exc:
+        print(f"ERROR: Post-promotion verification failed: {exc}", file=sys.stderr)
+        return 1
+
+    # 9. Concise audit / result output
+    print(f"CHANGE STATUS:       SUCCESS")
+    print(f"Transition:          {active_version_before} -> {post_version}")
+    print(f"Artifact hash:       {cand_artifact_hash}")
+    print(f"Post-verification:   PASS (15 dispatches scored)")
+    print(f"Replay hash:         {post_pred['replay_hash']}")
+    print(f"Audit event:         PROMOTED ({args.history})")
+    print("=" * 70)
+    return 0
+
+
+# ==============================================================================
 # COMMAND: rollback
 # ==============================================================================
 
@@ -748,6 +1019,82 @@ def cmd_rollback(args: argparse.Namespace) -> int:
     print("Replay equality:   PASS")
     print(f"Active model:      {result.active_restored}")
     print("Status:            PASS")
+    return 0
+
+
+# ==============================================================================
+# COMMAND: rollback-to (Primary Live Operator Shortcut)
+# ==============================================================================
+
+def cmd_rollback_to(args: argparse.Namespace) -> int:
+    """Execute high-level authoritative rollback to specified version.
+
+    Wraps existing rollback engine (execute_rollback) strictly.
+    """
+    if not args.registry.exists():
+        print(f"ERROR: Active registry pointer missing: {args.registry}", file=sys.stderr)
+        return 1
+
+    target_version = getattr(args, "version", None) or getattr(args, "to", None)
+    if not target_version:
+        print("ERROR: No rollback target version specified.", file=sys.stderr)
+        return 1
+
+    try:
+        active_data = json.loads(args.registry.read_text(encoding="utf-8"))
+        curr_active = active_data.get("production_version", "unknown")
+    except Exception as exc:
+        print(f"ERROR: Failed to read active registry: {exc}", file=sys.stderr)
+        return 1
+
+    print("=" * 70)
+    print("OPERATOR ROLLBACK REQUEST")
+    print("=" * 70)
+    print(f"Current active:  {curr_active}")
+    print(f"Rollback target: {target_version}")
+    print("-" * 70)
+
+    timestamp_utc = dt.datetime.now(dt.timezone.utc).isoformat()
+
+    try:
+        result = execute_rollback(
+            target_version=target_version,
+            registry_path=args.registry,
+            history_path=args.history,
+            models_dir=args.models_dir,
+            data_dir=args.data,
+            replay_week=args.week,
+            expected_replay_hash=args.expected_hash,
+            timestamp_utc=timestamp_utc,
+        )
+    except RollbackTargetValidationError as exc:
+        print(f"Target validation: FAIL ({exc})", file=sys.stderr)
+        print("Status:            FAIL", file=sys.stderr)
+        return 1
+    except RollbackReplayMismatchError as exc:
+        print("Target validation: PASS")
+        print("Atomic switch:     FAILED (COMPENSATING ROLLBACK EXECUTED)")
+        print("Replay equality:   FAIL")
+        print(f"Active model:      {curr_active} (restored)")
+        print(f"ERROR: Replay mismatch: {exc}", file=sys.stderr)
+        print("Status:            FAIL", file=sys.stderr)
+        return 1
+    except RollbackError as exc:
+        print(f"ERROR: Rollback failed: {exc}", file=sys.stderr)
+        print("Status:            FAIL", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        print(f"ERROR: Unexpected error during rollback: {exc}", file=sys.stderr)
+        print("Status:            FAIL", file=sys.stderr)
+        return 1
+
+    print("Target validation: PASS")
+    print("Atomic switch:     PASS")
+    print("Replay equality:   PASS")
+    print(f"Active model:      {result.active_restored}")
+    print(f"Replay hash:       {result.post_rollback_replay_hash}")
+    print("Status:            PASS")
+    print("=" * 70)
     return 0
 
 
@@ -1051,6 +1398,29 @@ def build_parser() -> argparse.ArgumentParser:
     p_demo.add_argument("--history", type=pathlib.Path, default=pathlib.Path("registry/history.jsonl"))
     p_demo.add_argument("--models-dir", type=pathlib.Path, default=pathlib.Path("models"))
 
+    # change (Primary Live Operator Shortcut)
+    p_change = subparsers.add_parser("change", help="Orchestrate end-to-end model change through authoritative gate")
+    p_change.add_argument("--candidate", type=str, default="v0002", help="Candidate model version to evaluate and promote")
+    p_change.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
+    p_change.add_argument("--week", type=str, default="2026-02-02", help="Scoring week date (YYYY-MM-DD)")
+    p_change.add_argument("--policy", type=pathlib.Path, default=pathlib.Path("policy.json"), help="Path to policy.json")
+    p_change.add_argument("--yes", action="store_true", help="Non-interactive headless confirmation")
+    p_change.add_argument("--dry-run", action="store_true", help="Read-only promotion evaluation without registry mutation")
+    p_change.add_argument("--registry", type=pathlib.Path, default=pathlib.Path("registry/active.json"))
+    p_change.add_argument("--history", type=pathlib.Path, default=pathlib.Path("registry/history.jsonl"))
+    p_change.add_argument("--models-dir", type=pathlib.Path, default=pathlib.Path("models"))
+
+    # rollback-to (Primary Live Operator Shortcut)
+    p_rb_to = subparsers.add_parser("rollback-to", help="Orchestrate atomic rollback to target version via existing rollback engine")
+    p_rb_to.add_argument("--version", type=str, default="v0001", help="Target model version for rollback")
+    p_rb_to.add_argument("--to", type=str, default=None, dest="to", help="Alias for --version")
+    p_rb_to.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
+    p_rb_to.add_argument("--week", type=str, default="2026-02-02", help="Replay week date (YYYY-MM-DD)")
+    p_rb_to.add_argument("--expected-hash", type=str, default=None, help="Expected replay hash for target")
+    p_rb_to.add_argument("--registry", type=pathlib.Path, default=pathlib.Path("registry/active.json"))
+    p_rb_to.add_argument("--history", type=pathlib.Path, default=pathlib.Path("registry/history.jsonl"))
+    p_rb_to.add_argument("--models-dir", type=pathlib.Path, default=pathlib.Path("models"))
+
     return parser
 
 
@@ -1068,6 +1438,8 @@ def main() -> None:
         "verify": cmd_verify,
         "demo": cmd_demo,
         "restore-snapshot": cmd_restore_snapshot,
+        "change": cmd_change,
+        "rollback-to": cmd_rollback_to,
     }
 
     handler = dispatch.get(args.command)

@@ -34,6 +34,18 @@ if "%1"=="run" (
     %PYTHON% scripts/ops.py status --export registry_certified_baseline.json
 ) else if "%1"=="ops-restore" (
     %PYTHON% scripts/ops.py restore-snapshot --from registry_certified_baseline.json
+) else if "%1"=="ops-change" (
+    if "%2"=="" (
+        %PYTHON% scripts/ops.py change --candidate v0002 --data ./data --yes
+    ) else (
+        %PYTHON% scripts/ops.py change --candidate %2 --data ./data --yes
+    )
+) else if "%1"=="ops-rollback-to" (
+    if "%2"=="" (
+        %PYTHON% scripts/ops.py rollback-to --version v0001 --data ./data --week 2026-02-02
+    ) else (
+        %PYTHON% scripts/ops.py rollback-to --version %2 --data ./data --week 2026-02-02
+    )
 ) else (
     %PYTHON% scripts/make_submission.py --data ./data
 )
