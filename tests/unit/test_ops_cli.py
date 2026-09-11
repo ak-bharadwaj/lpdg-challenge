@@ -527,3 +527,73 @@ def test_preflight_require_clean_tree(repo_data_dir: pathlib.Path):
     )
     assert passed is True, f"Standard preflight failed: {errors}"
 
+
+def test_status_export_and_restore_snapshot(tmp_path: pathlib.Path):
+    """Verify snapshot export is read-only and restore-snapshot restores exact state."""
+    from scripts.ops import cmd_restore_snapshot
+
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+    snapshot_file = tmp_path / "snapshot.json"
+
+    # Set up initial test registry
+    init_active = {"production_version": "v0001", "previous_version": "v_promotable", "changed_at": "2026-09-06T00:00:00Z"}
+    reg_file.write_text(json.dumps(init_active), encoding="utf-8")
+    init_hist = '{"event": "INITIALIZED", "version": "v0001"}\n'
+    hist_file.write_text(init_hist, encoding="utf-8")
+
+    # 1. Export snapshot
+    args_export = argparse.Namespace(
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+        export=snapshot_file,
+    )
+    ret_exp = cmd_status(args_export)
+    assert ret_exp == 0
+    assert snapshot_file.exists()
+
+    # 2. Mutate registry to simulate live session changes
+    reg_file.write_text(json.dumps({"production_version": "v_promotable", "previous_version": "v0001"}), encoding="utf-8")
+    hist_file.write_text(init_hist + '{"event": "PROMOTED", "version": "v_promotable"}\n', encoding="utf-8")
+
+    # 3. Restore snapshot
+    args_restore = argparse.Namespace(
+        from_snapshot=snapshot_file,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=pathlib.Path("models"),
+    )
+    ret_rest = cmd_restore_snapshot(args_restore)
+    assert ret_rest == 0
+
+    # 4. Assert restored state matches initial state
+    restored_active = json.loads(reg_file.read_text(encoding="utf-8"))
+    assert restored_active["production_version"] == "v0001"
+    assert restored_active["previous_version"] == "v_promotable"
+    assert hist_file.read_text(encoding="utf-8") == init_hist
+
+
+def test_promote_with_unseen_month_data_directory(tmp_path: pathlib.Path):
+    """Verify promote evaluates against historical data when unseen data directory lacks field_visits."""
+    unseen_dir = tmp_path / "unseen_eval_data"
+    create_unseen_month_dataset(unseen_dir, week_str="2026-04-06")
+
+    # Candidate v0002 should cleanly evaluate and be REJECTED without failing on missing field_visits
+    args = argparse.Namespace(
+        candidate="v0002",
+        data=unseen_dir,
+        week="2026-04-06",
+        policy=pathlib.Path("policy.json"),
+        yes=True,
+        dry_run=False,
+        registry=pathlib.Path("registry/active.json"),
+        history=pathlib.Path("registry/history.jsonl"),
+        models_dir=pathlib.Path("models"),
+    )
+
+    ret = cmd_promote(args)
+    # Return code must be 1 (rejection enforced)
+    assert ret == 1
+
+

@@ -128,7 +128,11 @@ def run_status(
         except Exception:
             pass
 
+    active_content = registry_path.read_text(encoding="utf-8") if registry_path.exists() else None
+    history_content = history_path.read_text(encoding="utf-8") if history_path.exists() else None
+
     return {
+        "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
         "active_model": active_model,
         "previous_model": prev_model,
         "artifact_hash": art_hash,
@@ -137,6 +141,8 @@ def run_status(
         "schema_contract": "PASS" if schema_ok else "FAIL",
         "git_tree": git_tree,
         "history": history_events,
+        "active_content": active_content,
+        "history_content": history_content,
     }
 
 
@@ -167,7 +173,64 @@ def cmd_status(args: argparse.Namespace) -> int:
             reason = ev.get("reason", "")
             print(f"  - [{ts}] {event}: {ver} ({reason})")
 
+    if getattr(args, "export", None):
+        snapshot_p = pathlib.Path(args.export)
+        snapshot_p.parent.mkdir(parents=True, exist_ok=True)
+        snapshot_p.write_text(json.dumps(status, indent=2), encoding="utf-8")
+        print(f"\nSnapshot exported to: {snapshot_p}")
+
     return 0 if (status["registry"] == "PASS" and status["artifact_integrity"] == "PASS" and status["schema_contract"] == "PASS") else 1
+
+
+def cmd_restore_snapshot(args: argparse.Namespace) -> int:
+    """Safely restore registry state from exported snapshot."""
+    if not args.from_snapshot.exists():
+        print(f"ERROR: Snapshot file does not exist: {args.from_snapshot}", file=sys.stderr)
+        return 1
+
+    try:
+        data = json.loads(args.from_snapshot.read_text(encoding="utf-8"))
+        active_json_text = data.get("active_content")
+        history_jsonl_text = data.get("history_content")
+        target_version = data.get("active_model", "v0001")
+
+        if not active_json_text:
+            print("ERROR: Invalid snapshot file: missing active_content", file=sys.stderr)
+            return 1
+
+        # Verify target model artifact before restoring
+        target_dir = args.models_dir / target_version
+        if not target_dir.exists() or not target_dir.is_dir():
+            print(f"ERROR: Target model directory {target_dir} does not exist", file=sys.stderr)
+            return 1
+
+        manifest_p = target_dir / "manifest.json"
+        if not manifest_p.exists():
+            print(f"ERROR: Manifest missing for {target_version}", file=sys.stderr)
+            return 1
+
+        manifest = json.loads(manifest_p.read_text(encoding="utf-8"))
+        declared_hash = manifest.get("artifact_hash", "")
+        computed_hash = compute_artifact_hash(target_dir)
+        if declared_hash != computed_hash:
+            print(f"ERROR: Artifact hash mismatch for {target_version}", file=sys.stderr)
+            return 1
+
+        # Atomically restore active.json
+        tmp_p = args.registry.with_suffix(".tmp")
+        tmp_p.write_text(active_json_text, encoding="utf-8")
+        tmp_p.replace(args.registry)
+
+        # Restore history.jsonl if present
+        if history_jsonl_text is not None:
+            args.history.write_text(history_jsonl_text, encoding="utf-8")
+
+        print(f"Registry state safely restored from snapshot: {args.from_snapshot}")
+        print(f"Active model restored: {target_version}")
+        return 0
+    except Exception as exc:
+        print(f"ERROR: Failed to restore snapshot: {exc}", file=sys.stderr)
+        return 1
 
 
 # ==============================================================================
@@ -458,8 +521,12 @@ def run_evaluation(
             holdout_missed_pair=(17, 14),
         )
     else:
+        eval_data_dir = data_dir
+        if not (eval_data_dir / "field_visits.csv").exists() and pathlib.Path("data/field_visits.csv").exists():
+            eval_data_dir = pathlib.Path("data")
+
         report = evaluate_candidate_against_active(
-            data_dir=data_dir,
+            data_dir=eval_data_dir,
             candidate_version=candidate_version,
             active_version=resolved_active,
             registry_path=registry_path,
@@ -903,9 +970,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     # status
     p_status = subparsers.add_parser("status", help="Read-only operator status summary")
+    p_status.add_argument("--export", type=pathlib.Path, default=None, dest="export", help="Export status snapshot JSON (Read-Only)")
+    p_status.add_argument("--export-snapshot", type=pathlib.Path, default=None, dest="export", help="Alias for --export")
     p_status.add_argument("--registry", type=pathlib.Path, default=pathlib.Path("registry/active.json"))
     p_status.add_argument("--history", type=pathlib.Path, default=pathlib.Path("registry/history.jsonl"))
     p_status.add_argument("--models-dir", type=pathlib.Path, default=pathlib.Path("models"))
+
+    # restore-snapshot
+    p_restore = subparsers.add_parser("restore-snapshot", help="Safely restore registry state from exported snapshot")
+    p_restore.add_argument("--from", type=pathlib.Path, required=True, dest="from_snapshot", help="Path to snapshot JSON")
+    p_restore.add_argument("--registry", type=pathlib.Path, default=pathlib.Path("registry/active.json"))
+    p_restore.add_argument("--history", type=pathlib.Path, default=pathlib.Path("registry/history.jsonl"))
+    p_restore.add_argument("--models-dir", type=pathlib.Path, default=pathlib.Path("models"))
 
     # preflight
     p_preflight = subparsers.add_parser("preflight", help="Read-only preflight safety and contract verification")
@@ -991,6 +1067,7 @@ def main() -> None:
         "rollback": cmd_rollback,
         "verify": cmd_verify,
         "demo": cmd_demo,
+        "restore-snapshot": cmd_restore_snapshot,
     }
 
     handler = dispatch.get(args.command)

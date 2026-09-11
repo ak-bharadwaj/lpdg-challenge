@@ -112,6 +112,8 @@ Conforming strictly to Challenge Brief Part 1 Section 7 and ARCHITECTURE_v25_FRE
   > 4. Replay Proof: It runs post-switch prediction and proves bit-for-bit deterministic replay equality against the expected baseline prediction hash.
   > 5. Active Restored: Registry state confirms `v0001` is restored. Replay equality: PASS."*
 
+*(For interactive live evaluator sessions consuming arbitrary unseen-month data handed over by evaluators, see the step-by-step operator commands in [`docs/recording/LIVE_OPERATOR_REHEARSAL.md`](file:///c:/Users/dorni/OneDrive/Desktop/lpdg/docs/recording/LIVE_OPERATOR_REHEARSAL.md)).*
+
 ### 7:15 – 8:00: Empirical Fleet Boundaries & Two-Week Operational Delta
 - **Screen Action**: Display `LIMITATIONS.md` Sections 1 and 5.
 - **Spoken Dialogue**:

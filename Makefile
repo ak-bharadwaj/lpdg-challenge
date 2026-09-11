@@ -2,12 +2,16 @@
 
 PYTHON ?= python
 
-.PHONY: help run train predict promote rollback test drift clean frontend ops-status ops-preflight ops-live ops-evaluate ops-promote ops-rollback ops-verify ops-demo
+.PHONY: help run train predict promote rollback test drift clean frontend ops-status ops-preflight ops-live ops-evaluate ops-promote ops-rollback ops-verify ops-demo ops-snapshot ops-restore
 
-LIVE_DATA ?= ./data
-LIVE_WEEK ?=
+DATA ?= ./data
+LIVE_DATA ?= $(DATA)
+WEEK ?=
+LIVE_WEEK ?= $(WEEK)
 CANDIDATE ?= v0002
 TARGET ?=
+VERSION ?= $(TARGET)
+SNAPSHOT ?= registry_certified_baseline.json
 
 help:
 	@echo "Available commands:"
@@ -27,6 +31,8 @@ help:
 	@echo "  make ops-rollback  - Reversible atomic rollback"
 	@echo "  make ops-verify    - Read-only explicit-version replay verification"
 	@echo "  make ops-demo      - Orchestrated 8-step live session demonstration"
+	@echo "  make ops-snapshot  - Export read-only certified baseline registry snapshot"
+	@echo "  make ops-restore   - Safely restore registry state from exported snapshot"
 
 run:
 	$(PYTHON) scripts/make_submission.py --data ./data
@@ -75,5 +81,11 @@ ops-verify:
 
 ops-demo:
 	$(PYTHON) scripts/ops.py demo --data $(LIVE_DATA) $(if $(LIVE_WEEK),--week $(LIVE_WEEK),)
+
+ops-snapshot:
+	$(PYTHON) scripts/ops.py status --export $(SNAPSHOT)
+
+ops-restore:
+	$(PYTHON) scripts/ops.py restore-snapshot --from $(SNAPSHOT)
 
 

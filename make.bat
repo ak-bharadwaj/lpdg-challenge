@@ -30,6 +30,10 @@ if "%1"=="run" (
     %PYTHON% scripts/ops.py verify --data ./data --week 2026-02-02 --version v0001
 ) else if "%1"=="ops-demo" (
     %PYTHON% scripts/ops.py demo --data ./data --week 2026-02-02
+) else if "%1"=="ops-snapshot" (
+    %PYTHON% scripts/ops.py status --export registry_certified_baseline.json
+) else if "%1"=="ops-restore" (
+    %PYTHON% scripts/ops.py restore-snapshot --from registry_certified_baseline.json
 ) else (
     %PYTHON% scripts/make_submission.py --data ./data
 )
