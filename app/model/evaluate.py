@@ -558,3 +558,116 @@ def evaluate_candidate_against_active(
         report_path.write_text(json.dumps(report.model_dump(), indent=2), encoding="utf-8")
 
     return report
+
+
+# ==============================================================================
+# FAQ Round 2 §4.1 Episode Cost Accounting Protocol
+# ==============================================================================
+
+class EpisodeCostAccountingResult(BaseModel):
+    """Deterministic episode cost accounting result per FAQ Round 2 §4.1.
+
+    Rules (FAQ 2.0 §4.1):
+    1. An episode is a maximal run of consecutive faulty weeks for a gateway.
+    2. The first selected visit within an episode is the only credited catch.
+    3. Missed fault penalty (€600/wk) is charged for weeks up to and including the week the first visit lands.
+    4. Missed cost stops after the first visit; subsequent weeks in the same continuous episode incur €0 missed penalty.
+    5. Subsequent selections in the same episode receive no additional €600 benefit.
+    6. Wasted visits: subsequent selections in the same episode cost €380 each but save €0 missed cost.
+    7. Episodes separated by healthy weeks are independent; visits in a new episode are credited separately.
+    8. Unvisited episodes are charged in full (length * €600).
+    """
+    total_episodes: int
+    episodes_caught: int
+    episodes_missed: int
+    total_faulty_weeks: int
+    charged_missed_weeks: int
+    saved_missed_weeks: int
+    missed_penalty_eur: float
+    total_visit_selections: int
+    first_catch_selections: int
+    wasted_repick_selections: int
+    total_visit_cost_eur: float
+    total_accounting_cost_eur: float
+
+    model_config = {"frozen": True}
+
+
+def evaluate_episode_cost_faq41(
+    episodes: List[List[dt.date | str]],
+    selected_weeks: Set[dt.date | str] | List[dt.date | str],
+    penalty_per_week: float = 600.0,
+    visit_cost_per_slot: float = 380.0,
+) -> EpisodeCostAccountingResult:
+    """Evaluate counterfactual episode cost accounting for a gateway per FAQ Round 2 §4.1.
+
+    Args:
+        episodes: List of maximal runs of consecutive faulty week dates for a gateway.
+                  e.g., [[w1, w2, w3, w4], [w6, w7]]
+        selected_weeks: Weeks in which the model selected/visited the gateway.
+        penalty_per_week: €600 per unserved faulty week.
+        visit_cost_per_slot: €380 per technician slot allocation.
+
+    Returns:
+        EpisodeCostAccountingResult detailing charged missed weeks, saved missed weeks,
+        first catch credits, wasted repicks, and total accounting costs.
+    """
+    sel_set = {_normalize_date(w) for w in selected_weeks}
+
+    total_episodes = len(episodes)
+    episodes_caught = 0
+    episodes_missed = 0
+    total_faulty_weeks = 0
+    charged_missed_weeks = 0
+    saved_missed_weeks = 0
+
+    total_visit_selections = 0
+    first_catch_selections = 0
+    wasted_repick_selections = 0
+
+    for ep in episodes:
+        normalized_ep = [_normalize_date(w) for w in ep]
+        ep_len = len(normalized_ep)
+        total_faulty_weeks += ep_len
+
+        # Find all visits in this episode
+        ep_visits = [w for w in normalized_ep if w in sel_set]
+        total_visit_selections += len(ep_visits)
+
+        if not ep_visits:
+            # Unvisited episode: charged in full
+            episodes_missed += 1
+            charged_missed_weeks += ep_len
+        else:
+            # Visited episode: first visit lands at earliest week
+            episodes_caught += 1
+            first_visit_idx = min(normalized_ep.index(w) for w in ep_visits)
+            first_catch_selections += 1
+            wasted_repick_selections += (len(ep_visits) - 1)
+
+            # Charged weeks: 1 up to first_visit_idx (1-based count = first_visit_idx + 1)
+            charged = first_visit_idx + 1
+            saved = ep_len - charged
+
+            charged_missed_weeks += charged
+            saved_missed_weeks += saved
+
+    missed_penalty_eur = charged_missed_weeks * penalty_per_week
+    total_visit_cost_eur = total_visit_selections * visit_cost_per_slot
+    total_accounting_cost_eur = missed_penalty_eur + total_visit_cost_eur
+
+    return EpisodeCostAccountingResult(
+        total_episodes=total_episodes,
+        episodes_caught=episodes_caught,
+        episodes_missed=episodes_missed,
+        total_faulty_weeks=total_faulty_weeks,
+        charged_missed_weeks=charged_missed_weeks,
+        saved_missed_weeks=saved_missed_weeks,
+        missed_penalty_eur=missed_penalty_eur,
+        total_visit_selections=total_visit_selections,
+        first_catch_selections=first_catch_selections,
+        wasted_repick_selections=wasted_repick_selections,
+        total_visit_cost_eur=total_visit_cost_eur,
+        total_accounting_cost_eur=total_accounting_cost_eur,
+    )
+
