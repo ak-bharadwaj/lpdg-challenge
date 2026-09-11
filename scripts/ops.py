@@ -255,6 +255,10 @@ def cmd_restore_snapshot(args: argparse.Namespace) -> int:
         print("ERROR: Invalid snapshot file: missing active_sha256 cryptographic binding", file=sys.stderr)
         return 1
 
+    if not snapshot_git:
+        print("ERROR: Invalid snapshot file: missing git_commit cryptographic binding", file=sys.stderr)
+        return 1
+
     # 2. Cryptographic binding check: active.json SHA256
     computed_active_sha = hashlib.sha256(active_json_text.encode("utf-8")).hexdigest()
     if expected_active_sha != computed_active_sha:
@@ -283,8 +287,11 @@ def cmd_restore_snapshot(args: argparse.Namespace) -> int:
         print(f"ERROR: Failed to parse active_content JSON: {exc}", file=sys.stderr)
         return 1
 
-    # 4. Cryptographic binding check: history.jsonl SHA256 (if present)
-    if history_jsonl_text is not None and expected_history_sha:
+    # 4. Cryptographic binding check: history.jsonl SHA256 (fail closed)
+    if history_jsonl_text is not None:
+        if not expected_history_sha:
+            print("ERROR: Invalid snapshot file: history_content present but history_sha256 binding missing", file=sys.stderr)
+            return 1
         computed_hist_sha = hashlib.sha256(history_jsonl_text.encode("utf-8")).hexdigest()
         if expected_history_sha != computed_hist_sha:
             print(
@@ -293,10 +300,16 @@ def cmd_restore_snapshot(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 1
+    elif expected_history_sha is not None:
+        print("ERROR: Invalid snapshot file: history_sha256 present but history_content is missing", file=sys.stderr)
+        return 1
 
-    # 5. Repository git commit check
+    # 5. Repository git commit check (fail closed)
     current_git = get_git_commit()
-    if snapshot_git and snapshot_git != "UNKNOWN" and current_git != "UNKNOWN":
+    if snapshot_git == "UNKNOWN":
+        print("ERROR: Certified snapshot has UNKNOWN git_commit binding", file=sys.stderr)
+        return 1
+    if current_git != "UNKNOWN":
         if snapshot_git != current_git:
             print(
                 f"ERROR: Repository git SHA mismatch: snapshot created at {snapshot_git} "
@@ -347,7 +360,9 @@ def cmd_restore_snapshot(args: argparse.Namespace) -> int:
 
         if history_jsonl_text is not None:
             args.history.parent.mkdir(parents=True, exist_ok=True)
-            args.history.write_text(history_jsonl_text, encoding="utf-8")
+            tmp_h = args.history.with_suffix(".tmp")
+            tmp_h.write_text(history_jsonl_text, encoding="utf-8")
+            tmp_h.replace(args.history)
 
         print(f"Registry state safely restored from certified snapshot: {args.from_snapshot}")
         print(f"Active model restored: {target_version}")
@@ -1035,7 +1050,7 @@ def cmd_rollback_to(args: argparse.Namespace) -> int:
         print(f"ERROR: Active registry pointer missing: {args.registry}", file=sys.stderr)
         return 1
 
-    target_version = getattr(args, "version", None) or getattr(args, "to", None)
+    target_version = getattr(args, "version", None) or getattr(args, "to", None) or getattr(args, "target", None)
     if not target_version:
         print("ERROR: No rollback target version specified.", file=sys.stderr)
         return 1
@@ -1400,7 +1415,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     # change (Primary Live Operator Shortcut)
     p_change = subparsers.add_parser("change", help="Orchestrate end-to-end model change through authoritative gate")
-    p_change.add_argument("--candidate", type=str, default="v0002", help="Candidate model version to evaluate and promote")
+    p_change.add_argument(
+        "--candidate",
+        "--target",
+        "--model",
+        dest="candidate",
+        type=str,
+        default="v0002",
+        help="Candidate model version to evaluate and promote",
+    )
     p_change.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
     p_change.add_argument("--week", type=str, default="2026-02-02", help="Scoring week date (YYYY-MM-DD)")
     p_change.add_argument("--policy", type=pathlib.Path, default=pathlib.Path("policy.json"), help="Path to policy.json")
@@ -1412,8 +1435,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     # rollback-to (Primary Live Operator Shortcut)
     p_rb_to = subparsers.add_parser("rollback-to", help="Orchestrate atomic rollback to target version via existing rollback engine")
-    p_rb_to.add_argument("--version", type=str, default="v0001", help="Target model version for rollback")
-    p_rb_to.add_argument("--to", type=str, default=None, dest="to", help="Alias for --version")
+    p_rb_to.add_argument(
+        "--version",
+        "--to",
+        "--target",
+        dest="version",
+        type=str,
+        default="v0001",
+        help="Target model version for rollback",
+    )
     p_rb_to.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
     p_rb_to.add_argument("--week", type=str, default="2026-02-02", help="Replay week date (YYYY-MM-DD)")
     p_rb_to.add_argument("--expected-hash", type=str, default=None, help="Expected replay hash for target")

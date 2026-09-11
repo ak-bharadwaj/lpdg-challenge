@@ -756,6 +756,52 @@ def test_restore_bad_snapshot_rejected(tmp_path: pathlib.Path):
         assert cmd_restore_snapshot(args_e) != 0
         assert reg_file.read_text(encoding="utf-8") == orig_active
 
+    # Case F: Missing git_commit binding
+    bad_f = snapshot_file.with_name("bad_f.json")
+    data_f = dict(valid_data)
+    data_f.pop("git_commit", None)
+    bad_f.write_text(json.dumps(data_f), encoding="utf-8")
+    args_f = argparse.Namespace(from_snapshot=bad_f, registry=reg_file, history=hist_file, models_dir=pathlib.Path("models"))
+    assert cmd_restore_snapshot(args_f) != 0
+    assert reg_file.read_text(encoding="utf-8") == orig_active
+
+    # Case G: history_content present but history_sha256 missing
+    bad_g = snapshot_file.with_name("bad_g.json")
+    data_g = dict(valid_data)
+    data_g.pop("history_sha256", None)
+    bad_g.write_text(json.dumps(data_g), encoding="utf-8")
+    args_g = argparse.Namespace(from_snapshot=bad_g, registry=reg_file, history=hist_file, models_dir=pathlib.Path("models"))
+    assert cmd_restore_snapshot(args_g) != 0
+    assert reg_file.read_text(encoding="utf-8") == orig_active
+
+    # Case H: history_sha256 present but history_content missing
+    bad_h = snapshot_file.with_name("bad_h.json")
+    data_h = dict(valid_data)
+    data_h["history_content"] = None
+    data_h["history_sha256"] = "some_sha_without_content"
+    bad_h.write_text(json.dumps(data_h), encoding="utf-8")
+    args_h = argparse.Namespace(from_snapshot=bad_h, registry=reg_file, history=hist_file, models_dir=pathlib.Path("models"))
+    assert cmd_restore_snapshot(args_h) != 0
+    assert reg_file.read_text(encoding="utf-8") == orig_active
+
+    # Case I: Missing active_sha256
+    bad_i = snapshot_file.with_name("bad_i.json")
+    data_i = dict(valid_data)
+    data_i.pop("active_sha256", None)
+    bad_i.write_text(json.dumps(data_i), encoding="utf-8")
+    args_i = argparse.Namespace(from_snapshot=bad_i, registry=reg_file, history=hist_file, models_dir=pathlib.Path("models"))
+    assert cmd_restore_snapshot(args_i) != 0
+    assert reg_file.read_text(encoding="utf-8") == orig_active
+
+    # Case J: git_commit is UNKNOWN
+    bad_j = snapshot_file.with_name("bad_j.json")
+    data_j = dict(valid_data)
+    data_j["git_commit"] = "UNKNOWN"
+    bad_j.write_text(json.dumps(data_j), encoding="utf-8")
+    args_j = argparse.Namespace(from_snapshot=bad_j, registry=reg_file, history=hist_file, models_dir=pathlib.Path("models"))
+    assert cmd_restore_snapshot(args_j) != 0
+    assert reg_file.read_text(encoding="utf-8") == orig_active
+
 
 def test_restore_wrong_artifact_hash_rejected(tmp_path: pathlib.Path):
     """Safety Invariant: Verify snapshot with wrong artifact hash fails closed and preserves registry."""
@@ -1053,5 +1099,27 @@ def test_change_has_no_force_option():
     parser = build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["change", "--candidate", "v0002", "--force"])
+
+
+def test_rollback_to_accepts_to_and_target_flags():
+    """Verify rollback-to parser accepts --version, --to, and --target flags without shadowing."""
+    parser = build_parser()
+    args1 = parser.parse_args(["rollback-to", "--version", "v_custom"])
+    assert args1.version == "v_custom"
+    args2 = parser.parse_args(["rollback-to", "--to", "v_custom"])
+    assert args2.version == "v_custom"
+    args3 = parser.parse_args(["rollback-to", "--target", "v_custom"])
+    assert args3.version == "v_custom"
+
+
+def test_change_accepts_candidate_and_target_flags():
+    """Verify change parser accepts --candidate, --target, and --model flags without shadowing."""
+    parser = build_parser()
+    args1 = parser.parse_args(["change", "--candidate", "v_custom"])
+    assert args1.candidate == "v_custom"
+    args2 = parser.parse_args(["change", "--target", "v_custom"])
+    assert args2.candidate == "v_custom"
+    args3 = parser.parse_args(["change", "--model", "v_custom"])
+    assert args3.candidate == "v_custom"
 
 

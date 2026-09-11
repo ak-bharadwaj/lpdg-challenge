@@ -12,6 +12,7 @@ CANDIDATE ?= v0002
 TARGET ?=
 VERSION ?= $(TARGET)
 SNAPSHOT ?= registry_certified_baseline.json
+YES ?= 1
 
 help:
 	@echo "Available commands:"
@@ -91,7 +92,7 @@ ops-restore:
 	$(PYTHON) scripts/ops.py restore-snapshot --from $(SNAPSHOT)
 
 ops-change:
-	$(PYTHON) scripts/ops.py change --candidate $(CANDIDATE) --data $(LIVE_DATA) $(if $(LIVE_WEEK),--week $(LIVE_WEEK),) --yes
+	$(PYTHON) scripts/ops.py change --candidate $(CANDIDATE) --data $(LIVE_DATA) $(if $(LIVE_WEEK),--week $(LIVE_WEEK),) $(if $(filter-out 0 false no,$(YES)),--yes,)
 
 ops-rollback-to:
 	$(PYTHON) scripts/ops.py rollback-to --version $(if $(VERSION),$(VERSION),$(if $(TARGET),$(TARGET),v0001)) --data $(LIVE_DATA) $(if $(LIVE_WEEK),--week $(LIVE_WEEK),)

@@ -180,7 +180,7 @@ make ops-verify LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK" TARGET=v0001
 For deep diagnostic inspections during evaluation or auditing, the lower-level CLI commands remain fully supported:
 
 - **`make ops-evaluate CANDIDATE=<ver>`**: Evaluates candidate multi-window rolling and grouped holdout evidence without modifying any registry state.
-- **`make ops-promote CANDIDATE=<ver>`**: Evaluates promotion gate and performs atomic switch with explicit confirmation prompt.
+- **`make ops-promote CANDIDATE=<ver>`**: Evaluates promotion gate and performs atomic switch with explicit confirmation prompt. When running as a deliberate negative test (`python scripts/ops.py promote --candidate v0002 --data "$LIVE_DATA" --yes`), expected result: REJECT / exit code 1. This non-zero exit is intentional and is not a rehearsal failure.
 - **`make ops-rollback TARGET=<ver>`**: Direct low-level rollback engine execution with replay comparison.
 
 ---
