@@ -16,6 +16,23 @@ if "%1"=="run" (
     %PYTHON% scripts/check_drift.py --data ./data
 ) else if "%1"=="frontend" (
     %PYTHON% frontend/server.py --port 8080
+) else if "%1"=="ops-status" (
+    %PYTHON% scripts/ops.py status
+) else if "%1"=="ops-preflight" (
+    %PYTHON% scripts/ops.py preflight --data ./data
+) else if "%1"=="ops-live" (
+    %PYTHON% scripts/ops.py run-live --data ./data --week 2026-02-02
+) else if "%1"=="ops-evaluate" (
+    %PYTHON% scripts/ops.py evaluate --candidate v0002 --data ./data
+) else if "%1"=="ops-promote" (
+    %PYTHON% scripts/ops.py promote --candidate v_promotable --data ./data --yes
+) else if "%1"=="ops-rollback" (
+    %PYTHON% scripts/ops.py rollback --to v0001 --data ./data --week 2026-02-02
+) else if "%1"=="ops-verify" (
+    %PYTHON% scripts/ops.py verify --data ./data --week 2026-02-02 --version v0001
+) else if "%1"=="ops-demo" (
+    %PYTHON% scripts/ops.py demo --data ./data --week 2026-02-02
 ) else (
     %PYTHON% scripts/make_submission.py --data ./data
 )
+
