@@ -127,8 +127,12 @@ make ops-change CANDIDATE=v0002 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
 
 ---
 
-### Step 5: High-Level Model Change with Validated Candidate (`v_promotable`)
-Orchestrate end-to-end model change through the authoritative lifecycle (preflight -> candidate validation -> gate evaluation -> confirmation -> atomic promotion -> post-verification):
+### Step 5: High-Level Model Change with Deterministic Rollback Fixture (`v_promotable`)
+Orchestrate end-to-end model change through the authoritative lifecycle (preflight -> candidate validation -> gate evaluation -> confirmation -> atomic promotion -> post-verification).
+
+> [!NOTE]
+> `v_promotable` is a deterministic rollback-demo fixture whose promotion decision is intentionally preconstructed for lifecycle rehearsal. Its synthetic evaluation numbers are not production model performance and do not represent evidence that `v0002` should be promoted. It exists strictly to exercise promotion and rollback mechanics safely.
+
 ```bash
 make ops-change CANDIDATE=v_promotable LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
 ```

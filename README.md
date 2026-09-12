@@ -29,7 +29,7 @@ make run
 - `make train`: Runs offline candidate construction, rolling-window backtesting, and evidence generation.
 - `make predict`: Generates predictions for a single week or batch.
 - `make promote`: Evaluates candidate against frozen promotion criteria (>=10% cost differential, no window regression, grouped holdout agreement).
-- `make rollback`: Demonstrates atomic rollback from `v_promotable` to `v0001` with cryptographic replay proof. *(Note: `v_promotable` is a committed, deterministic model package fixture used to demonstrate rollback mechanics because candidate `v0002` was legitimately rejected by production governance; see `DECISIONS.md` Section 4 and `MLOPS.md`).*
+- `make rollback`: Demonstrates atomic rollback from `v_promotable` to `v0001` with cryptographic replay proof. *(Note: `v_promotable` is a deterministic rollback-demo fixture whose promotion decision is intentionally preconstructed for lifecycle rehearsal. Its synthetic evaluation numbers are not production model performance and do not represent evidence to promote `v0002`; see `DECISIONS.md` Section 4 and `MLOPS.md`).*
 - `make test`: Runs the automated test suite (all P0 contracts).
 - `make drift`: Checks incoming telemetry against the frozen schema contract.
 

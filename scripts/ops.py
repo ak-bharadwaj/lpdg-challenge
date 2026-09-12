@@ -754,6 +754,9 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
 
 def cmd_promote(args: argparse.Namespace) -> int:
     """CLI handler for promote command."""
+    if not check_required_week(args):
+        return 1
+
     if not args.data.exists() or not args.data.is_dir():
         print(f"ERROR: Specified data directory does not exist: {args.data}", file=sys.stderr)
         return 1
@@ -770,7 +773,7 @@ def cmd_promote(args: argparse.Namespace) -> int:
             target_version=args.candidate,
             models_dir=args.models_dir,
             data_dir=args.data,
-            test_date=getattr(args, "week", "2026-02-02"),
+            test_date=args.week,
         )
         artifact_hash = val_info["artifact_hash"]
     except Exception as exc:

@@ -49,13 +49,17 @@ RAW DATA (./data)
 | Registry | `PROMOTED` | Active version updated atomically |
 | Registry | `ROLLED_BACK` | Prior version restored and validated |
 
-## Role of `v_promotable` in Lifecycle Rehearsal
+## Role of `v_promotable` in Lifecycle Rehearsal (Synthetic Rollback Fixture)
 
 To maintain production integrity, experimental candidate `v0002` was rejected by the promotion gate (`REJECT_GROUPED_DISAGREEMENT`) and was never deployed to production. To allow operators to rehearse and audit the rollback lifecycle without compromising governance integrity, the system includes `v_promotable` (`models/v_promotable`).
 
-- **Artifact Properties**: Shares the identical architecture and feature weights as `v0002` ($w_{\text{anomaly}} = 0.70$, $w_{\text{silence}} = 0.30$).
-- **Evidence Binding**: Certified by a committed evaluation report clearing all promotion gates (aggregate cost gain: 15.49%, holdout missed weeks: 17 → 14).
-- **Rollback Contract**: Used in `scripts/rollback.py` (`make rollback`) and `tests/unit/test_rollback.py` to demonstrate pre-validation, atomic pointer switch, and bit-for-bit replay equality without relying on unproven candidates.
+> [!IMPORTANT]
+> **Authoritative Distinction: Real Candidate vs. Synthetic Rollback Fixture**
+> - **REAL CANDIDATE (`v0002`)**: Evaluated against real challenge data. Development fleet improved 71 → 60 missed weeks, but the 59-gateway unseen holdout regressed 17 → 18 missed weeks. Decision: `REJECT_GROUPED_DISAGREEMENT`. Production remains safely on `v0001`.
+> - **ROLLBACK FIXTURE (`v_promotable`)**: A deterministic rollback-demo fixture whose promotion decision is intentionally preconstructed for lifecycle rehearsal. Its synthetic evaluation numbers (e.g. synthetic holdout 17 → 14) are **not production model performance**, **do not represent the official hidden-ground-truth score**, and **are not evidence that `v0002` should be promoted**. It exists exclusively to exercise and audit the rollback engine.
+
+- **Artifact Properties**: Shares the weighted multi-signal scoring architecture ($w_{\text{anomaly}} = 0.70$, $w_{\text{silence}} = 0.30$).
+- **Demonstration Purpose**: Used in `scripts/rollback.py` (`make rollback`), `make ops-change`, and `make ops-rollback-to` to demonstrate pre-validation, atomic pointer switch, and bit-for-bit replay equality without relying on an unvetted candidate.
 
 ## 4-Hour EDA & Feature-Freeze Discipline (v25 Contract)
 

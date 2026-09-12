@@ -143,6 +143,7 @@ def test_promote_wrapper_uses_existing_promotion_path(tmp_path: pathlib.Path, re
     args = argparse.Namespace(
         candidate="v_promotable",
         data=repo_data_dir,
+        week="2026-02-02",
         policy=pathlib.Path("policy.json"),
         yes=True,
         dry_run=False,
@@ -184,6 +185,7 @@ def test_promote_dry_run_is_read_only(tmp_path: pathlib.Path, repo_data_dir: pat
     args = argparse.Namespace(
         candidate="v_promotable",
         data=repo_data_dir,
+        week="2026-02-02",
         policy=pathlib.Path("policy.json"),
         yes=True,
         dry_run=True,
@@ -431,6 +433,7 @@ def test_promote_rejected_candidate_leaves_active_unchanged(tmp_path: pathlib.Pa
     args = argparse.Namespace(
         candidate="v0002",
         data=repo_data_dir,
+        week="2026-02-02",
         policy=pathlib.Path("policy.json"),
         yes=True,
         dry_run=False,
@@ -1195,6 +1198,12 @@ def test_live_commands_fail_closed_without_week(tmp_path: pathlib.Path, capsys):
 
     # 7. demo
     ret = cmd_demo(argparse.Namespace(data=data_dir, week=None, candidate="v0002", promotable="v_promotable", rollback_target="v0001", registry=reg_path, history=hist_path, models_dir=pathlib.Path("models")))
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "ERROR: --week is required for live operations." in err
+
+    # 8. promote
+    ret = cmd_promote(argparse.Namespace(candidate="v_promotable", data=data_dir, week=None, policy=pathlib.Path("policy.json"), yes=True, dry_run=False, registry=reg_path, history=hist_path, models_dir=pathlib.Path("models")))
     assert ret == 1
     err = capsys.readouterr().err
     assert "ERROR: --week is required for live operations." in err
