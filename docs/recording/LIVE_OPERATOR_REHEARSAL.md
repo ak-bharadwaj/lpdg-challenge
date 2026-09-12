@@ -22,6 +22,12 @@ This guide documents the authoritative execution sequence for live evaluation se
 4. **Certified Baseline vs. Live Mutation**:
    - **During the live session**: Registry pointer transitions (`active.json`) and audit trail appends (`history.jsonl`) are **expected and desirable** to demonstrate atomic promotion, candidate rejection enforcement, and compensating rollback.
    - **Before/After the rehearsal**: The repository baseline is protected via a cryptographically bound read-only snapshot export (`make ops-snapshot`) and safe restoration (`make ops-restore`).
+5. **Mandatory Live Week Parameter**:
+   All live-sensitive operator commands require `--week` / `LIVE_WEEK` to be explicitly specified. Hard-coded date fallbacks (such as `2026-02-02`) have been removed from the live CLI. If omitted, the command fails closed immediately:
+   ```
+   ERROR: --week is required for live operations.
+   Use the evaluator-supplied LIVE_WEEK.
+   ```
 
 ---
 

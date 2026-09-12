@@ -95,6 +95,16 @@ def compute_content_sha256(content: Optional[str]) -> Optional[str]:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
+def check_required_week(args: argparse.Namespace) -> bool:
+    """Validate that --week was provided for live operations; fail closed if missing."""
+    week = getattr(args, "week", None)
+    if not week:
+        print("ERROR: --week is required for live operations.", file=sys.stderr)
+        print("Use the evaluator-supplied LIVE_WEEK.", file=sys.stderr)
+        return False
+    return True
+
+
 # ==============================================================================
 # COMMAND: status
 # ==============================================================================
@@ -510,6 +520,9 @@ def run_preflight(
 
 def cmd_preflight(args: argparse.Namespace) -> int:
     """CLI handler for preflight command."""
+    if not check_required_week(args):
+        return 1
+
     passed, errors = run_preflight(
         data_dir=args.data,
         week=args.week,
@@ -537,6 +550,9 @@ def cmd_preflight(args: argparse.Namespace) -> int:
 
 def cmd_run_live(args: argparse.Namespace) -> int:
     """CLI handler for run-live command."""
+    if not check_required_week(args):
+        return 1
+
     if not args.data.exists() or not args.data.is_dir():
         print(f"ERROR: Specified data directory does not exist: {args.data}", file=sys.stderr)
         return 1
@@ -838,6 +854,9 @@ def cmd_change(args: argparse.Namespace) -> int:
       -> existing post-promotion verification
       -> concise audit / result output
     """
+    if not check_required_week(args):
+        return 1
+
     if not args.data.exists() or not args.data.is_dir():
         print(f"ERROR: Specified data directory does not exist: {args.data}", file=sys.stderr)
         return 1
@@ -973,6 +992,9 @@ def cmd_change(args: argparse.Namespace) -> int:
 
 def cmd_rollback(args: argparse.Namespace) -> int:
     """CLI handler for rollback command."""
+    if not check_required_week(args):
+        return 1
+
     if not args.registry.exists():
         print(f"ERROR: Active registry pointer missing: {args.registry}", file=sys.stderr)
         return 1
@@ -1046,6 +1068,9 @@ def cmd_rollback_to(args: argparse.Namespace) -> int:
 
     Wraps existing rollback engine (execute_rollback) strictly.
     """
+    if not check_required_week(args):
+        return 1
+
     if not args.registry.exists():
         print(f"ERROR: Active registry pointer missing: {args.registry}", file=sys.stderr)
         return 1
@@ -1119,6 +1144,9 @@ def cmd_rollback_to(args: argparse.Namespace) -> int:
 
 def cmd_verify(args: argparse.Namespace) -> int:
     """CLI handler for verify command (Read-Only explicit-version verification)."""
+    if not check_required_week(args):
+        return 1
+
     if not args.data.exists() or not args.data.is_dir():
         print(f"ERROR: Specified data directory does not exist: {args.data}", file=sys.stderr)
         return 1
@@ -1200,6 +1228,9 @@ def cmd_verify(args: argparse.Namespace) -> int:
 
 def cmd_demo(args: argparse.Namespace) -> int:
     """Orchestrate end-to-end live session demonstration without bypassing lifecycle."""
+    if not check_required_week(args):
+        return 1
+
     print("=" * 80)
     print("STARTING LIVE SESSION OPERATOR DEMONSTRATION")
     print("=" * 80)
@@ -1348,7 +1379,7 @@ def build_parser() -> argparse.ArgumentParser:
     # preflight
     p_preflight = subparsers.add_parser("preflight", help="Read-only preflight safety and contract verification")
     p_preflight.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
-    p_preflight.add_argument("--week", type=str, default="2026-02-02", help="Live week (YYYY-MM-DD)")
+    p_preflight.add_argument("--week", type=str, default=None, help="Live week (YYYY-MM-DD)")
     p_preflight.add_argument("--require-clean-tree", action="store_true", help="Fail preflight if git working tree is dirty")
     p_preflight.add_argument("--registry", type=pathlib.Path, default=pathlib.Path("registry/active.json"))
     p_preflight.add_argument("--models-dir", type=pathlib.Path, default=pathlib.Path("models"))
@@ -1356,7 +1387,7 @@ def build_parser() -> argparse.ArgumentParser:
     # run-live
     p_live = subparsers.add_parser("run-live", help="Execute live prediction pipeline for operator week")
     p_live.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
-    p_live.add_argument("--week", type=str, default="2026-02-02", help="Scored Monday date (YYYY-MM-DD)")
+    p_live.add_argument("--week", type=str, default=None, help="Scored Monday date (YYYY-MM-DD)")
     p_live.add_argument("--output", type=pathlib.Path, default=pathlib.Path("predictions_week.csv"))
     p_live.add_argument("--backlog-report", type=pathlib.Path, default=pathlib.Path("backlog_report.json"))
     p_live.add_argument("--run-record", type=pathlib.Path, default=pathlib.Path("runs/prediction/run.json"))
@@ -1375,7 +1406,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_promote = subparsers.add_parser("promote", help="Evaluate and atomically promote candidate model")
     p_promote.add_argument("--candidate", type=str, default="v_promotable", help="Candidate model version")
     p_promote.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
-    p_promote.add_argument("--week", type=str, default="2026-02-02", help="Validation smoke test week (YYYY-MM-DD)")
+    p_promote.add_argument("--week", type=str, default=None, help="Validation smoke test week (YYYY-MM-DD)")
     p_promote.add_argument("--policy", type=pathlib.Path, default=pathlib.Path("policy.json"), help="Path to policy.json")
     p_promote.add_argument("--yes", action="store_true", help="Non-interactive headless confirmation")
     p_promote.add_argument("--dry-run", action="store_true", help="Read-only promotion evaluation without registry mutation")
@@ -1387,7 +1418,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_rb = subparsers.add_parser("rollback", help="Execute atomic model rollback with deterministic replay verification")
     p_rb.add_argument("--to", type=str, default=None, help="Target model version (default: previous_version from registry)")
     p_rb.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
-    p_rb.add_argument("--week", type=str, default="2026-02-02", help="Replay week (YYYY-MM-DD)")
+    p_rb.add_argument("--week", type=str, default=None, help="Replay week (YYYY-MM-DD)")
     p_rb.add_argument("--expected-hash", type=str, default=None, help="Expected replay hash for target")
     p_rb.add_argument("--registry", type=pathlib.Path, default=pathlib.Path("registry/active.json"))
     p_rb.add_argument("--history", type=pathlib.Path, default=pathlib.Path("registry/history.jsonl"))
@@ -1396,7 +1427,7 @@ def build_parser() -> argparse.ArgumentParser:
     # verify
     p_ver = subparsers.add_parser("verify", help="Read-only explicit-version prediction and replay determinism proof")
     p_ver.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
-    p_ver.add_argument("--week", type=str, default="2026-02-02", help="Evaluation week (YYYY-MM-DD)")
+    p_ver.add_argument("--week", type=str, default=None, help="Evaluation week (YYYY-MM-DD)")
     p_ver.add_argument("--version", type=str, default=None, help="Model version to verify (default: v0001)")
     p_ver.add_argument("--target", type=str, default=None, dest="target", help="Alias for --version")
     p_ver.add_argument("--registry", type=pathlib.Path, default=pathlib.Path("registry/active.json"))
@@ -1405,7 +1436,7 @@ def build_parser() -> argparse.ArgumentParser:
     # demo
     p_demo = subparsers.add_parser("demo", help="Orchestrate full live session demonstration sequence")
     p_demo.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
-    p_demo.add_argument("--week", type=str, default="2026-02-02", help="Live week (YYYY-MM-DD)")
+    p_demo.add_argument("--week", type=str, default=None, help="Live week (YYYY-MM-DD)")
     p_demo.add_argument("--candidate", type=str, default="v0002", help="Experimental candidate")
     p_demo.add_argument("--promotable", type=str, default="v_promotable", help="Promotable fixture")
     p_demo.add_argument("--rollback-target", type=str, default="v0001", help="Target version for rollback")
@@ -1425,7 +1456,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Candidate model version to evaluate and promote",
     )
     p_change.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
-    p_change.add_argument("--week", type=str, default="2026-02-02", help="Scoring week date (YYYY-MM-DD)")
+    p_change.add_argument("--week", type=str, default=None, help="Scoring week date (YYYY-MM-DD)")
     p_change.add_argument("--policy", type=pathlib.Path, default=pathlib.Path("policy.json"), help="Path to policy.json")
     p_change.add_argument("--yes", action="store_true", help="Non-interactive headless confirmation")
     p_change.add_argument("--dry-run", action="store_true", help="Read-only promotion evaluation without registry mutation")
@@ -1445,7 +1476,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Target model version for rollback",
     )
     p_rb_to.add_argument("--data", type=pathlib.Path, default=pathlib.Path("data"), help="Path to data directory")
-    p_rb_to.add_argument("--week", type=str, default="2026-02-02", help="Replay week date (YYYY-MM-DD)")
+    p_rb_to.add_argument("--week", type=str, default=None, help="Replay week date (YYYY-MM-DD)")
     p_rb_to.add_argument("--expected-hash", type=str, default=None, help="Expected replay hash for target")
     p_rb_to.add_argument("--registry", type=pathlib.Path, default=pathlib.Path("registry/active.json"))
     p_rb_to.add_argument("--history", type=pathlib.Path, default=pathlib.Path("registry/history.jsonl"))

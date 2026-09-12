@@ -1123,3 +1123,201 @@ def test_change_accepts_candidate_and_target_flags():
     assert args3.candidate == "v_custom"
 
 
+# ==============================================================================
+# 16. LIVE COMMANDS WEEK REQUIREMENT & SYNTHETIC MAY 2026 REHEARSAL
+# ==============================================================================
+
+def test_live_commands_parser_week_defaults_to_none():
+    """Safety Invariant: Verify all live commands default --week to None in parser to prevent accidental old-data fallback."""
+    parser = build_parser()
+
+    subcommands = [
+        ("preflight", ["preflight", "--data", "data"]),
+        ("run-live", ["run-live", "--data", "data"]),
+        ("promote", ["promote", "--candidate", "v_promotable"]),
+        ("rollback", ["rollback", "--to", "v0001"]),
+        ("verify", ["verify", "--data", "data"]),
+        ("demo", ["demo", "--data", "data"]),
+        ("change", ["change", "--candidate", "v_promotable"]),
+        ("rollback-to", ["rollback-to", "--version", "v0001"]),
+    ]
+
+    for name, argv in subcommands:
+        args = parser.parse_args(argv)
+        assert args.week is None, f"Command '{name}' must have default week=None, got: {args.week}"
+
+
+def test_live_commands_fail_closed_without_week(tmp_path: pathlib.Path, capsys):
+    """Safety Invariant: Verify live commands fail closed with clear error message when --week is omitted."""
+    data_dir = tmp_path / "dummy_data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    reg_path = tmp_path / "active.json"
+    hist_path = tmp_path / "history.jsonl"
+    reg_path.write_text(json.dumps({"production_version": "v0001"}), encoding="utf-8")
+    hist_path.write_text('{"event": "INITIALIZED", "version": "v0001"}\n', encoding="utf-8")
+
+    # 1. preflight
+    ret = cmd_preflight(argparse.Namespace(data=data_dir, week=None, registry=reg_path, models_dir=pathlib.Path("models")))
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "ERROR: --week is required for live operations." in err
+    assert "Use the evaluator-supplied LIVE_WEEK." in err
+
+    # 2. run-live
+    ret = cmd_run_live(argparse.Namespace(data=data_dir, week=None, output=None, backlog_report=None, run_record=None, registry=reg_path, models_dir=pathlib.Path("models")))
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "ERROR: --week is required for live operations." in err
+
+    # 3. change
+    ret = cmd_change(argparse.Namespace(candidate="v_promotable", data=data_dir, week=None, policy=pathlib.Path("policy.json"), yes=True, dry_run=False, registry=reg_path, history=hist_path, models_dir=pathlib.Path("models")))
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "ERROR: --week is required for live operations." in err
+
+    # 4. rollback
+    ret = cmd_rollback(argparse.Namespace(to="v0001", data=data_dir, week=None, expected_hash=None, registry=reg_path, history=hist_path, models_dir=pathlib.Path("models")))
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "ERROR: --week is required for live operations." in err
+
+    # 5. rollback-to
+    ret = cmd_rollback_to(argparse.Namespace(version="v0001", to="v0001", data=data_dir, week=None, expected_hash=None, registry=reg_path, history=hist_path, models_dir=pathlib.Path("models")))
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "ERROR: --week is required for live operations." in err
+
+    # 6. verify
+    ret = cmd_verify(argparse.Namespace(data=data_dir, week=None, version="v0001", target=None, registry=reg_path, models_dir=pathlib.Path("models")))
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "ERROR: --week is required for live operations." in err
+
+    # 7. demo
+    ret = cmd_demo(argparse.Namespace(data=data_dir, week=None, candidate="v0002", promotable="v_promotable", rollback_target="v0001", registry=reg_path, history=hist_path, models_dir=pathlib.Path("models")))
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "ERROR: --week is required for live operations." in err
+
+
+def test_rehearsal_unseen_month_non_february_live_week(tmp_path: pathlib.Path):
+    """End-to-End Live Rehearsal: Verify primary operator sequence on synthetic non-February live week (2026-05-04)."""
+    live_week = "2026-05-04"
+    unseen_dir = tmp_path / "evaluator_unseen_data"
+    create_unseen_month_dataset(unseen_dir, week_str=live_week)
+
+    reg_file = tmp_path / "active.json"
+    hist_file = tmp_path / "history.jsonl"
+    models_dir = pathlib.Path("models")
+
+    # Certified baseline: active is v0001
+    reg_file.write_text(
+        json.dumps({"production_version": "v0001", "previous_version": None, "changed_at": "2026-09-05T00:00:00Z"}, indent=2),
+        encoding="utf-8",
+    )
+    hist_file.write_text(
+        json.dumps({"event": "INITIALIZED", "version": "v0001", "timestamp": "2026-09-05T00:00:00Z"}) + "\n",
+        encoding="utf-8",
+    )
+
+    # Step 1: Status Inspection (Read-Only)
+    st = run_status(registry_path=reg_file, history_path=hist_file, models_dir=models_dir)
+    assert st["active_model"] == "v0001"
+    assert st["registry"] == "PASS"
+
+    # Step 2: Preflight on May 2026 unseen data
+    args_pf = argparse.Namespace(data=unseen_dir, week=live_week, registry=reg_file, models_dir=models_dir, require_clean_tree=False)
+    ret_pf = cmd_preflight(args_pf)
+    assert ret_pf == 0, "Preflight on 2026-05-04 must pass"
+
+    # Step 3: Run Live Prediction with baseline v0001
+    pred_csv = tmp_path / "preds_step3.csv"
+    args_live1 = argparse.Namespace(
+        data=unseen_dir,
+        week=live_week,
+        output=pred_csv,
+        backlog_report=None,
+        run_record=None,
+        registry=reg_file,
+        models_dir=models_dir,
+    )
+    ret_live1 = cmd_run_live(args_live1)
+    assert ret_live1 == 0, "Live prediction on 2026-05-04 must succeed"
+
+    # Extract Step 3 baseline replay hash
+    res_baseline = predict_week(data_dir=unseen_dir, week_start=live_week, registry_path=reg_file, models_dir=models_dir)
+    baseline_hash = res_baseline["replay_hash"]
+    assert len(res_baseline["predictions"]) == 15
+
+    # Step 4: Deliberate Negative Test: Model change attempt on rejected candidate v0002
+    args_change_v2 = argparse.Namespace(
+        candidate="v0002",
+        data=unseen_dir,
+        week=live_week,
+        policy=pathlib.Path("policy.json"),
+        yes=True,
+        dry_run=False,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=models_dir,
+    )
+    ret_change_v2 = cmd_change(args_change_v2)
+    assert ret_change_v2 == 1, "ops-change on v0002 must exit with non-zero code 1"
+    active_now = json.loads(reg_file.read_text(encoding="utf-8"))["production_version"]
+    assert active_now == "v0001", "Production active model must remain strictly on v0001 after rejection"
+
+    # Step 5: High-Level Model Change with Validated Candidate v_promotable
+    args_change_prom = argparse.Namespace(
+        candidate="v_promotable",
+        data=unseen_dir,
+        week=live_week,
+        policy=pathlib.Path("policy.json"),
+        yes=True,
+        dry_run=False,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=models_dir,
+    )
+    ret_change_prom = cmd_change(args_change_prom)
+    assert ret_change_prom == 0, "ops-change on v_promotable must succeed"
+    assert json.loads(reg_file.read_text(encoding="utf-8"))["production_version"] == "v_promotable"
+
+    # Step 6: Live Prediction under Changed Active Model
+    res_promoted = predict_week(data_dir=unseen_dir, week_start=live_week, registry_path=reg_file, models_dir=models_dir)
+    assert res_promoted["active_version"] == "v_promotable"
+    assert res_promoted["replay_hash"] != baseline_hash, "Promoted model must produce distinct replay hash"
+
+    # Step 7: Atomic Rollback to Baseline Model v0001
+    args_rollback = argparse.Namespace(
+        version="v0001",
+        to="v0001",
+        target="v0001",
+        data=unseen_dir,
+        week=live_week,
+        expected_hash=baseline_hash,
+        registry=reg_file,
+        history=hist_file,
+        models_dir=models_dir,
+    )
+    ret_rb = cmd_rollback_to(args_rollback)
+    assert ret_rb == 0, "ops-rollback-to v0001 must succeed"
+    assert json.loads(reg_file.read_text(encoding="utf-8"))["production_version"] == "v0001"
+
+    # Step 8: Replay Verification & Bit-for-Bit Determinism Proof
+    args_verify = argparse.Namespace(
+        data=unseen_dir,
+        week=live_week,
+        version="v0001",
+        target="v0001",
+        registry=reg_file,
+        models_dir=models_dir,
+    )
+    ret_ver = cmd_verify(args_verify)
+    assert ret_ver == 0, "ops-verify must prove bit-for-bit determinism"
+
+    res_restored = predict_week(data_dir=unseen_dir, week_start=live_week, registry_path=reg_file, models_dir=models_dir)
+    assert res_restored["active_version"] == "v0001"
+    assert res_restored["replay_hash"] == baseline_hash, "Restored active model replay hash must match Step 3 exactly"
+
+
+

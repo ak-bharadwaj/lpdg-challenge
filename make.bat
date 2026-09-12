@@ -1,5 +1,9 @@
 @echo off
 set PYTHON=python
+set OP_DATA=--data ./data
+if not "%LIVE_DATA%"=="" set OP_DATA=--data %LIVE_DATA%
+set OP_WEEK=
+if not "%LIVE_WEEK%"=="" set OP_WEEK=--week %LIVE_WEEK%
 if "%1"=="run" (
     %PYTHON% scripts/make_submission.py --data ./data
 ) else if "%1"=="train" (
@@ -17,40 +21,40 @@ if "%1"=="run" (
 ) else if "%1"=="ops-status" (
     %PYTHON% scripts/ops.py status
 ) else if "%1"=="ops-preflight" (
-    %PYTHON% scripts/ops.py preflight --data ./data
+    %PYTHON% scripts/ops.py preflight %OP_DATA% %OP_WEEK%
 ) else if "%1"=="ops-live" (
-    %PYTHON% scripts/ops.py run-live --data ./data --week 2026-02-02
+    %PYTHON% scripts/ops.py run-live %OP_DATA% %OP_WEEK%
 ) else if "%1"=="ops-evaluate" (
-    %PYTHON% scripts/ops.py evaluate --candidate v0002 --data ./data
+    %PYTHON% scripts/ops.py evaluate --candidate v0002 %OP_DATA%
 ) else if "%1"=="ops-promote" (
-    %PYTHON% scripts/ops.py promote --candidate v_promotable --data ./data --yes
+    %PYTHON% scripts/ops.py promote --candidate v_promotable %OP_DATA% %OP_WEEK% --yes
 ) else if "%1"=="ops-rollback" (
-    %PYTHON% scripts/ops.py rollback --to v0001 --data ./data --week 2026-02-02
+    %PYTHON% scripts/ops.py rollback --to v0001 %OP_DATA% %OP_WEEK%
 ) else if "%1"=="ops-verify" (
-    %PYTHON% scripts/ops.py verify --data ./data --week 2026-02-02 --version v0001
+    %PYTHON% scripts/ops.py verify %OP_DATA% %OP_WEEK% --version v0001
 ) else if "%1"=="ops-demo" (
-    %PYTHON% scripts/ops.py demo --data ./data --week 2026-02-02
+    %PYTHON% scripts/ops.py demo %OP_DATA% %OP_WEEK%
 ) else if "%1"=="ops-snapshot" (
     %PYTHON% scripts/ops.py status --export registry_certified_baseline.json
 ) else if "%1"=="ops-restore" (
     %PYTHON% scripts/ops.py restore-snapshot --from registry_certified_baseline.json
 ) else if "%1"=="ops-change" (
     if "%2"=="" (
-        %PYTHON% scripts/ops.py change --candidate v0002 --data ./data --yes
+        %PYTHON% scripts/ops.py change --candidate v0002 %OP_DATA% %OP_WEEK% --yes
     ) else if /i "%2"=="CANDIDATE" (
-        %PYTHON% scripts/ops.py change --candidate %3 --data ./data --yes
+        %PYTHON% scripts/ops.py change --candidate %3 %OP_DATA% %OP_WEEK% --yes
     ) else (
-        %PYTHON% scripts/ops.py change --candidate %2 --data ./data --yes
+        %PYTHON% scripts/ops.py change --candidate %2 %OP_DATA% %OP_WEEK% --yes
     )
 ) else if "%1"=="ops-rollback-to" (
     if "%2"=="" (
-        %PYTHON% scripts/ops.py rollback-to --version v0001 --data ./data --week 2026-02-02
+        %PYTHON% scripts/ops.py rollback-to --version v0001 %OP_DATA% %OP_WEEK%
     ) else if /i "%2"=="VERSION" (
-        %PYTHON% scripts/ops.py rollback-to --version %3 --data ./data --week 2026-02-02
+        %PYTHON% scripts/ops.py rollback-to --version %3 %OP_DATA% %OP_WEEK%
     ) else if /i "%2"=="TARGET" (
-        %PYTHON% scripts/ops.py rollback-to --version %3 --data ./data --week 2026-02-02
+        %PYTHON% scripts/ops.py rollback-to --version %3 %OP_DATA% %OP_WEEK%
     ) else (
-        %PYTHON% scripts/ops.py rollback-to --version %2 --data ./data --week 2026-02-02
+        %PYTHON% scripts/ops.py rollback-to --version %2 %OP_DATA% %OP_WEEK%
     )
 ) else (
     %PYTHON% scripts/make_submission.py --data ./data
