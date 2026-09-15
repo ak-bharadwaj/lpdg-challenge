@@ -20,6 +20,7 @@ import csv
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import pathlib
 import subprocess
@@ -755,13 +756,19 @@ def validate_and_display_predictions(
             return False, f"Duplicate gateway ID found: '{r_gw}' at row {idx}", None
         seen_gateways.add(r_gw)
 
-        # 4. Score check
+        # 4. Score check (parse with float, require finite value, reject NaN/+inf/-inf)
         if not r_score_str:
             return False, f"Row {idx} has missing score for gateway '{r_gw}'", None
         try:
-            float(r_score_str)
+            score_val = float(r_score_str)
         except ValueError:
             return False, f"Row {idx} has non-float score '{r_score_str}' for gateway '{r_gw}'", None
+        if not math.isfinite(score_val):
+            return (
+                False,
+                f"Row {idx} has non-finite score '{r_score_str}' (must be a finite float, not NaN or +/-Inf) for gateway '{r_gw}'",
+                None,
+            )
 
         # 5. Reason check
         if not r_reason:
@@ -808,19 +815,30 @@ def validate_and_display_predictions(
     model_version = "UNKNOWN"
     provenance_status = "NOT_CHECKED"
 
-    if run_record_path and run_record_path.exists():
-        try:
-            rec_data = json.loads(run_record_path.read_text(encoding="utf-8"))
-            if isinstance(rec_data, dict):
-                model_version = rec_data.get("model_version") or "UNKNOWN"
-                rec_hash = rec_data.get("predictions_file_hash")
-                if rec_hash:
-                    if rec_hash == file_hash:
-                        provenance_status = "PASS (matched run record)"
-                    else:
-                        provenance_status = f"MISMATCH (file {file_hash[:16]}... vs run record {rec_hash[:16]}...)"
-        except Exception:
-            pass
+    if run_record_path is not None:
+        if run_record_path.exists():
+            try:
+                rec_data = json.loads(run_record_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                return False, f"Run record '{run_record_path}' is malformed JSON: {exc}", None
+
+            if not isinstance(rec_data, dict):
+                return False, f"Run record '{run_record_path}' is malformed: expected JSON object", None
+
+            model_version = rec_data.get("model_version") or "UNKNOWN"
+            rec_hash = rec_data.get("predictions_file_hash")
+            if not rec_hash or not isinstance(rec_hash, str) or not rec_hash.strip():
+                return False, f"Run record '{run_record_path}' is missing required 'predictions_file_hash'", None
+
+            if rec_hash.strip() != file_hash:
+                return (
+                    False,
+                    f"Provenance mismatch: file hash ({file_hash}) does not match run record predictions_file_hash ({rec_hash.strip()})",
+                    None,
+                )
+            provenance_status = "PASS (matched run record)"
+        elif run_record_path != pathlib.Path("runs/prediction/run.json"):
+            return False, f"Specified run record file does not exist: {run_record_path}", None
 
     # Sort rows by rank
     parsed_rows.sort(key=lambda x: x["rank"])

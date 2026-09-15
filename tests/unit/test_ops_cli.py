@@ -1597,4 +1597,139 @@ def test_show_predictions_real_live_integration(repo_data_dir: pathlib.Path, tmp
     assert len(table_lines) >= 15
 
 
+def test_show_predictions_tampered_csv_with_stale_run_record_fails(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when CSV is tampered after run record creation."""
+    rows = _make_valid_15_rows("2026-02-02")
+    csv_file = tmp_path / "preds.csv"
+    _write_csv(csv_file, rows)
+
+    csv_bytes = csv_file.read_bytes()
+    expected_hash = f"sha256:{hashlib.sha256(csv_bytes).hexdigest()}"
+
+    run_record_file = tmp_path / "run.json"
+    run_record_file.write_text(
+        json.dumps({
+            "model_version": "v0001",
+            "predictions_file_hash": expected_hash,
+            "week_start": "2026-02-02",
+        }),
+        encoding="utf-8",
+    )
+
+    # Tamper with CSV content after run record generation
+    tampered_rows = [r.copy() for r in rows]
+    tampered_rows[1][2] = "0639EADEAD01"  # change gateway ID in row 1
+    _write_csv(csv_file, tampered_rows)
+
+    args = argparse.Namespace(output=csv_file, week="2026-02-02", run_record=run_record_file)
+    ret = cmd_show_predictions(args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "Provenance mismatch" in err
+    assert "Status: FAIL" in err
+
+
+def test_show_predictions_tampered_run_record_hash_fails(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when run record hash has been tampered with."""
+    rows = _make_valid_15_rows("2026-02-02")
+    csv_file = tmp_path / "preds.csv"
+    _write_csv(csv_file, rows)
+
+    run_record_file = tmp_path / "run.json"
+    run_record_file.write_text(
+        json.dumps({
+            "model_version": "v0001",
+            "predictions_file_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "week_start": "2026-02-02",
+        }),
+        encoding="utf-8",
+    )
+
+    args = argparse.Namespace(output=csv_file, week="2026-02-02", run_record=run_record_file)
+    ret = cmd_show_predictions(args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "Provenance mismatch" in err
+    assert "Status: FAIL" in err
+
+
+def test_show_predictions_malformed_or_missing_provenance_hash_fails(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when run record is malformed or missing hash."""
+    rows = _make_valid_15_rows("2026-02-02")
+    csv_file = tmp_path / "preds.csv"
+    _write_csv(csv_file, rows)
+
+    # 1. Malformed JSON
+    bad_json_file = tmp_path / "run_bad.json"
+    bad_json_file.write_text("{not valid json", encoding="utf-8")
+    args1 = argparse.Namespace(output=csv_file, week="2026-02-02", run_record=bad_json_file)
+    assert cmd_show_predictions(args1) == 1
+    assert "malformed JSON" in capsys.readouterr().err
+
+    # 2. Non-dict JSON (e.g. array)
+    arr_json_file = tmp_path / "run_arr.json"
+    arr_json_file.write_text("[]", encoding="utf-8")
+    args2 = argparse.Namespace(output=csv_file, week="2026-02-02", run_record=arr_json_file)
+    assert cmd_show_predictions(args2) == 1
+    assert "expected JSON object" in capsys.readouterr().err
+
+    # 3. Missing predictions_file_hash key
+    no_hash_file = tmp_path / "run_nohash.json"
+    no_hash_file.write_text(json.dumps({"model_version": "v0001"}), encoding="utf-8")
+    args3 = argparse.Namespace(output=csv_file, week="2026-02-02", run_record=no_hash_file)
+    assert cmd_show_predictions(args3) == 1
+    assert "missing required 'predictions_file_hash'" in capsys.readouterr().err
+
+    # 4. Empty predictions_file_hash
+    empty_hash_file = tmp_path / "run_emptyhash.json"
+    empty_hash_file.write_text(json.dumps({"predictions_file_hash": ""}), encoding="utf-8")
+    args4 = argparse.Namespace(output=csv_file, week="2026-02-02", run_record=empty_hash_file)
+    assert cmd_show_predictions(args4) == 1
+    assert "missing required 'predictions_file_hash'" in capsys.readouterr().err
+
+
+def test_show_predictions_nan_inf_scores_fail(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when score is NaN or +/-Inf."""
+    for non_finite in ["nan", "NaN", "NAN", "inf", "+inf", "-inf", "Infinity", "-Infinity"]:
+        rows = _make_valid_15_rows("2026-02-02")
+        rows[3][3] = non_finite
+        csv_file = tmp_path / f"preds_{non_finite.replace('+', 'p').replace('-', 'm')}.csv"
+        _write_csv(csv_file, rows)
+
+        args = argparse.Namespace(output=csv_file, week="2026-02-02", run_record=None)
+        ret = cmd_show_predictions(args)
+        assert ret == 1, f"Expected rejection of non-finite score '{non_finite}'"
+        err = capsys.readouterr().err
+        assert f"non-finite score '{non_finite}'" in err
+
+
+def test_show_predictions_genuine_generated_predictions_pass(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions strictly validates and passes genuine generated predictions with exact run record match."""
+    rows = _make_valid_15_rows("2026-02-02")
+    csv_file = tmp_path / "genuine_preds.csv"
+    _write_csv(csv_file, rows)
+
+    file_bytes = csv_file.read_bytes()
+    expected_hash = f"sha256:{hashlib.sha256(file_bytes).hexdigest()}"
+
+    run_record_file = tmp_path / "run_genuine.json"
+    run_record_file.write_text(
+        json.dumps({
+            "model_version": "v0001",
+            "predictions_file_hash": expected_hash,
+            "week_start": "2026-02-02",
+        }),
+        encoding="utf-8",
+    )
+
+    args = argparse.Namespace(output=csv_file, week="2026-02-02", run_record=run_record_file)
+    ret = cmd_show_predictions(args)
+    assert ret == 0
+    out = capsys.readouterr().out
+    assert "Provenance:        PASS (matched run record)" in out
+    assert "Status:            PASS" in out
+    assert "Row count:         15" in out
+
+
+
 
