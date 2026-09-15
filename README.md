@@ -62,11 +62,13 @@ This system does not claim complete fleet visibility or calibrated failure proba
 
 ## 6–8 Minute Walkthrough Recording (Operations-Manager Register)
 
-Per Challenge Brief Part 1 Section 7 and ARCHITECTURE_v25_FREEZE.md Section 17, the 6–8 minute operations-manager walkthrough video demonstrates the end-to-end lifecycle, deterministic rejection of `v0002`, and atomic rollback with replay proof:
+Per the Final FAQ and ARCHITECTURE_v25_FREEZE.md Section 17, the 6–8 minute operations-manager walkthrough video demonstrates the end-to-end lifecycle, deterministic rejection of `v0002`, and atomic rollback with replay proof.
 
-- **Deliverable Artifacts**:
-  - **Video Deliverable**: `docs/recording/walkthrough.mp4` (submitted alongside the repository archive per Challenge Brief Section 7).
+- **Walkthrough Video Link**:
+  - The 6–8 minute walkthrough will be provided as an unlisted external link and will be placed in this README upon final recording: `[Unlisted Video Walkthrough Link - Pending Recording]`
+- **Repository Supporting Documentation**:
   - **Verbatim Cue-Sheet & Script**: [`docs/recording/WALKTHROUGH_SCRIPT.md`](docs/recording/WALKTHROUGH_SCRIPT.md) (complete minute-by-minute spoken dialogue and terminal actions).
+  - **Live Operator Rehearsal Guide**: [`docs/recording/LIVE_OPERATOR_REHEARSAL.md`](docs/recording/LIVE_OPERATOR_REHEARSAL.md) (comprehensive live session execution commands and rehearsal runbook).
 - **Storyline Structure (v25 Section 17)**:
   1. `0:00 - 1:00`: Core operational problem & why MLOps lifecycle governance (Track F) protects the €380/visit allocation.
   2. `1:00 - 2:15`: Clean clone execution via `make run` generating 120 validated predictions and passing `validate_submission.py`.
