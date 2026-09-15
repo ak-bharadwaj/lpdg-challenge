@@ -655,6 +655,224 @@ def cmd_run_live(args: argparse.Namespace) -> int:
 
 
 # ==============================================================================
+# COMMAND: show-predictions
+# ==============================================================================
+
+def validate_and_display_predictions(
+    output_path: pathlib.Path,
+    week: Optional[str] = None,
+    run_record_path: Optional[pathlib.Path] = None,
+) -> tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+    """Strictly validate and display the live prediction artifact.
+
+    Fail-closed invariants:
+    - prediction file must exist and be readable.
+    - CSV format must be valid.
+    - required columns ('week_start', 'rank', 'gateway_id', 'score', 'reason') must be present.
+    - row count must be exactly 15 for the requested live week.
+    - ranks must be exactly 1..15 without gaps or duplicates.
+    - gateway IDs must be unique across the 15 dispatches.
+    - score values must be non-empty valid floats.
+    - reason values must be non-empty strings.
+    - week values must be consistent and match --week when supplied.
+
+    Display and validation only:
+    - Never recomputes predictions or modifies registry/artifacts.
+    - Validates SHA-256 hash against run record provenance where available.
+    """
+    if not output_path.exists():
+        return False, f"Prediction file not found: {output_path}", None
+    if not output_path.is_file():
+        return False, f"Prediction path is not a file: {output_path}", None
+
+    try:
+        with open(output_path, "r", newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            header = next(reader, None)
+            if header is None:
+                return False, f"Prediction file is empty: {output_path}", None
+            raw_rows = list(reader)
+    except Exception as exc:
+        return False, f"Failed to parse CSV file '{output_path}': {exc}", None
+
+    # Required columns
+    expected_header = ["week_start", "rank", "gateway_id", "score", "reason"]
+    clean_header = [col.strip() for col in header]
+    missing_cols = [col for col in expected_header if col not in clean_header]
+    if missing_cols:
+        return False, f"Missing required columns in CSV: {missing_cols}", None
+
+    # Filter out empty trailing lines if any
+    non_empty_rows = [r for r in raw_rows if any(cell.strip() for cell in r)]
+
+    if len(non_empty_rows) != 15:
+        return (
+            False,
+            f"Invalid row count: expected exactly 15 rows for live week, found {len(non_empty_rows)}",
+            None,
+        )
+
+    # Column index mapping
+    col_map = {name: clean_header.index(name) for name in expected_header}
+
+    seen_ranks: set[int] = set()
+    seen_gateways: set[str] = set()
+    week_values: set[str] = set()
+    parsed_rows: list[Dict[str, Any]] = []
+
+    for idx, row in enumerate(non_empty_rows, start=1):
+        if len(row) < len(clean_header):
+            return False, f"Row {idx} has fewer columns ({len(row)}) than header ({len(clean_header)})", None
+
+        r_week = row[col_map["week_start"]].strip()
+        r_rank_str = row[col_map["rank"]].strip()
+        r_gw = row[col_map["gateway_id"]].strip()
+        r_score_str = row[col_map["score"]].strip()
+        r_reason = row[col_map["reason"]].strip()
+
+        # 1. Week check
+        if not r_week:
+            return False, f"Row {idx} has empty week_start", None
+        try:
+            dt.date.fromisoformat(r_week)
+        except ValueError:
+            return False, f"Row {idx} has invalid week date format '{r_week}'", None
+        week_values.add(r_week)
+
+        # 2. Rank check
+        try:
+            r_rank = int(r_rank_str)
+        except ValueError:
+            return False, f"Row {idx} has non-integer rank '{r_rank_str}'", None
+        if r_rank in seen_ranks:
+            return False, f"Duplicate rank found: {r_rank} at row {idx}", None
+        seen_ranks.add(r_rank)
+
+        # 3. Gateway ID check
+        if not r_gw:
+            return False, f"Row {idx} has empty gateway_id", None
+        if r_gw in seen_gateways:
+            return False, f"Duplicate gateway ID found: '{r_gw}' at row {idx}", None
+        seen_gateways.add(r_gw)
+
+        # 4. Score check
+        if not r_score_str:
+            return False, f"Row {idx} has missing score for gateway '{r_gw}'", None
+        try:
+            float(r_score_str)
+        except ValueError:
+            return False, f"Row {idx} has non-float score '{r_score_str}' for gateway '{r_gw}'", None
+
+        # 5. Reason check
+        if not r_reason:
+            return False, f"Row {idx} has missing reason for gateway '{r_gw}'", None
+
+        parsed_rows.append({
+            "week_start": r_week,
+            "rank": r_rank,
+            "gateway_id": r_gw,
+            "score": r_score_str,
+            "reason": r_reason,
+        })
+
+    # Validate ranks are exactly 1..15 contiguous
+    expected_ranks = list(range(1, 16))
+    if sorted(seen_ranks) != expected_ranks:
+        return (
+            False,
+            f"Ranks must be exactly 1..15 without gaps or missing values; found {sorted(seen_ranks)}",
+            None,
+        )
+
+    # Validate week consistency across all 15 rows
+    if len(week_values) > 1:
+        return (
+            False,
+            f"Inconsistent week_start values across rows: {sorted(week_values)}",
+            None,
+        )
+
+    actual_week = next(iter(week_values))
+    if week and actual_week != week:
+        return (
+            False,
+            f"Week in predictions CSV ('{actual_week}') does not match requested week ('{week}')",
+            None,
+        )
+
+    # Compute artifact SHA-256 hash
+    file_bytes = output_path.read_bytes()
+    file_hash = f"sha256:{hashlib.sha256(file_bytes).hexdigest()}"
+
+    # Cross-reference run record provenance if available
+    model_version = "UNKNOWN"
+    provenance_status = "NOT_CHECKED"
+
+    if run_record_path and run_record_path.exists():
+        try:
+            rec_data = json.loads(run_record_path.read_text(encoding="utf-8"))
+            if isinstance(rec_data, dict):
+                model_version = rec_data.get("model_version") or "UNKNOWN"
+                rec_hash = rec_data.get("predictions_file_hash")
+                if rec_hash:
+                    if rec_hash == file_hash:
+                        provenance_status = "PASS (matched run record)"
+                    else:
+                        provenance_status = f"MISMATCH (file {file_hash[:16]}... vs run record {rec_hash[:16]}...)"
+        except Exception:
+            pass
+
+    # Sort rows by rank
+    parsed_rows.sort(key=lambda x: x["rank"])
+
+    # Output formatting
+    print("LIVE PREDICTIONS")
+    print("----------------")
+    if model_version != "UNKNOWN":
+        print(f"Model version:     {model_version}")
+    print(f"Week:              {actual_week}")
+    print(f"Row count:         {len(parsed_rows)}")
+    print(f"File:              {output_path.resolve()}")
+    print(f"Artifact hash:     {file_hash}")
+    if provenance_status != "NOT_CHECKED":
+        print(f"Provenance:        {provenance_status}")
+    print("Status:            PASS")
+    print()
+    print(f"{'Rank':>4}  {'Gateway ID':<14}  {'Score':<10}  {'Reason'}")
+    print("-" * 80)
+    for r in parsed_rows:
+        print(f"{r['rank']:>4}  {r['gateway_id']:<14}  {r['score']:<10}  {r['reason']}")
+
+    payload = {
+        "week": actual_week,
+        "row_count": len(parsed_rows),
+        "model_version": model_version,
+        "artifact_hash": file_hash,
+        "provenance_status": provenance_status,
+        "predictions": parsed_rows,
+    }
+    return True, None, payload
+
+
+def cmd_show_predictions(args: argparse.Namespace) -> int:
+    """CLI handler for show-predictions command."""
+    output_path = args.output
+    week = getattr(args, "week", None)
+    run_record = getattr(args, "run_record", pathlib.Path("runs/prediction/run.json"))
+
+    ok, err_msg, _ = validate_and_display_predictions(
+        output_path=output_path,
+        week=week,
+        run_record_path=run_record,
+    )
+    if not ok:
+        print(f"ERROR: Live predictions validation failed: {err_msg}", file=sys.stderr)
+        print("Status: FAIL", file=sys.stderr)
+        return 1
+    return 0
+
+
+# ==============================================================================
 # COMMAND: evaluate
 # ==============================================================================
 
@@ -1485,6 +1703,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_rb_to.add_argument("--history", type=pathlib.Path, default=pathlib.Path("registry/history.jsonl"))
     p_rb_to.add_argument("--models-dir", type=pathlib.Path, default=pathlib.Path("models"))
 
+    # show-predictions (Strict Live Artifact Display & Validation)
+    p_show = subparsers.add_parser("show-predictions", help="Display and strictly validate live predictions artifact")
+    p_show.add_argument(
+        "--output",
+        type=pathlib.Path,
+        default=pathlib.Path("predictions_week.csv"),
+        help="Path to live predictions CSV file (default: predictions_week.csv)",
+    )
+    p_show.add_argument("--week", type=str, default=None, help="Expected scoring week date (YYYY-MM-DD)")
+    p_show.add_argument(
+        "--run-record",
+        type=pathlib.Path,
+        default=pathlib.Path("runs/prediction/run.json"),
+        help="Path to prediction run record for provenance verification",
+    )
+
     return parser
 
 
@@ -1496,6 +1730,7 @@ def main() -> None:
         "status": cmd_status,
         "preflight": cmd_preflight,
         "run-live": cmd_run_live,
+        "show-predictions": cmd_show_predictions,
         "evaluate": cmd_evaluate,
         "promote": cmd_promote,
         "rollback": cmd_rollback,

@@ -38,12 +38,14 @@ from scripts.ops import (
     cmd_rollback,
     cmd_rollback_to,
     cmd_run_live,
+    cmd_show_predictions,
     cmd_status,
     cmd_verify,
     get_git_commit,
     run_evaluation,
     run_preflight,
     run_status,
+    validate_and_display_predictions,
 )
 from tests.fixtures.unseen_month_fixture import create_unseen_month_dataset
 
@@ -1327,6 +1329,272 @@ def test_rehearsal_unseen_month_non_february_live_week(tmp_path: pathlib.Path):
     res_restored = predict_week(data_dir=unseen_dir, week_start=live_week, registry_path=reg_file, models_dir=models_dir)
     assert res_restored["active_version"] == "v0001"
     assert res_restored["replay_hash"] == baseline_hash, "Restored active model replay hash must match Step 3 exactly"
+
+
+# ==============================================================================
+# 22. show_predictions tests (Validation & Fail-Closed Invariants)
+# ==============================================================================
+
+def _make_valid_15_rows(week: str = "2026-02-02") -> list[list[str]]:
+    """Helper generating 15 canonical prediction rows for testing."""
+    rows = [["week_start", "rank", "gateway_id", "score", "reason"]]
+    for r in range(1, 16):
+        gid = f"0639EA{r:06X}"
+        score = f"{0.30 - (r * 0.01):.6f}"
+        reason = f"Multi-signal risk score {score} for gateway {gid}"
+        rows.append([week, str(r), gid, score, reason])
+    return rows
+
+
+def _write_csv(path: pathlib.Path, rows: list[list[str]]) -> None:
+    import csv
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f, lineterminator="\n")
+        writer.writerows(rows)
+
+
+def test_show_predictions_missing_file_fails(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when prediction file does not exist."""
+    missing_csv = tmp_path / "nonexistent_predictions.csv"
+    args = argparse.Namespace(output=missing_csv, week=None, run_record=None)
+    ret = cmd_show_predictions(args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "Prediction file not found" in err
+    assert "Status: FAIL" in err
+
+
+def test_show_predictions_malformed_csv_fails(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when CSV file is empty or unparseable."""
+    bad_csv = tmp_path / "empty.csv"
+    bad_csv.write_text("", encoding="utf-8")
+    args = argparse.Namespace(output=bad_csv, week=None, run_record=None)
+    ret = cmd_show_predictions(args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "Prediction file is empty" in err
+
+
+def test_show_predictions_wrong_row_count_fails(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when row count is != 15."""
+    # 14 rows
+    rows_14 = _make_valid_15_rows()[:-1]
+    csv_14 = tmp_path / "preds_14.csv"
+    _write_csv(csv_14, rows_14)
+
+    args = argparse.Namespace(output=csv_14, week=None, run_record=None)
+    ret = cmd_show_predictions(args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "expected exactly 15 rows for live week, found 14" in err
+
+    # 16 rows
+    rows_16 = _make_valid_15_rows() + [["2026-02-02", "16", "0639EA000010", "0.100000", "Extra row"]]
+    csv_16 = tmp_path / "preds_16.csv"
+    _write_csv(csv_16, rows_16)
+
+    args = argparse.Namespace(output=csv_16, week=None, run_record=None)
+    ret = cmd_show_predictions(args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "expected exactly 15 rows for live week, found 16" in err
+
+
+def test_show_predictions_duplicate_ranks_fail(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when duplicate ranks are present."""
+    rows = _make_valid_15_rows()
+    rows[2][1] = "1"  # duplicate rank 1 at row 2
+    csv_dup = tmp_path / "preds_dup_rank.csv"
+    _write_csv(csv_dup, rows)
+
+    args = argparse.Namespace(output=csv_dup, week=None, run_record=None)
+    ret = cmd_show_predictions(args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "Duplicate rank found: 1" in err
+
+
+def test_show_predictions_duplicate_gateway_ids_fail(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when duplicate gateway IDs are present."""
+    rows = _make_valid_15_rows()
+    rows[2][2] = rows[1][2]  # duplicate gateway ID
+    csv_dup = tmp_path / "preds_dup_gw.csv"
+    _write_csv(csv_dup, rows)
+
+    args = argparse.Namespace(output=csv_dup, week=None, run_record=None)
+    ret = cmd_show_predictions(args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "Duplicate gateway ID found" in err
+
+
+def test_show_predictions_inconsistent_week_fails(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed on inconsistent or mismatching week dates."""
+    # 1. Row week does not match requested week
+    rows = _make_valid_15_rows("2026-02-02")
+    csv_file = tmp_path / "preds_week.csv"
+    _write_csv(csv_file, rows)
+
+    args = argparse.Namespace(output=csv_file, week="2026-03-02", run_record=None)
+    ret = cmd_show_predictions(args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "does not match requested week ('2026-03-02')" in err
+
+    # 2. Inconsistent weeks across rows
+    rows_inconsistent = _make_valid_15_rows("2026-02-02")
+    rows_inconsistent[3][0] = "2026-02-09"
+    csv_inconsistent = tmp_path / "preds_inconsistent.csv"
+    _write_csv(csv_inconsistent, rows_inconsistent)
+
+    args2 = argparse.Namespace(output=csv_inconsistent, week=None, run_record=None)
+    ret2 = cmd_show_predictions(args2)
+    assert ret2 == 1
+    err2 = capsys.readouterr().err
+    assert "Inconsistent week_start values across rows" in err2
+
+
+def test_show_predictions_missing_required_columns_fails(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when required columns are omitted."""
+    rows = [["week_start", "rank", "gateway_id", "score"]]  # missing 'reason'
+    for r in range(1, 16):
+        rows.append(["2026-02-02", str(r), f"0639EA{r:06X}", "0.250000"])
+    csv_bad_header = tmp_path / "preds_no_reason.csv"
+    _write_csv(csv_bad_header, rows)
+
+    args = argparse.Namespace(output=csv_bad_header, week=None, run_record=None)
+    ret = cmd_show_predictions(args)
+    assert ret == 1
+    err = capsys.readouterr().err
+    assert "Missing required columns in CSV: ['reason']" in err
+
+
+def test_show_predictions_missing_values_fail(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions fails closed when score or reason contains empty/missing values."""
+    # Empty score
+    rows_no_score = _make_valid_15_rows()
+    rows_no_score[5][3] = ""
+    csv_no_score = tmp_path / "preds_no_score.csv"
+    _write_csv(csv_no_score, rows_no_score)
+
+    args1 = argparse.Namespace(output=csv_no_score, week=None, run_record=None)
+    ret1 = cmd_show_predictions(args1)
+    assert ret1 == 1
+    err1 = capsys.readouterr().err
+    assert "missing score for gateway" in err1
+
+    # Empty reason
+    rows_no_reason = _make_valid_15_rows()
+    rows_no_reason[5][4] = ""
+    csv_no_reason = tmp_path / "preds_no_reason.csv"
+    _write_csv(csv_no_reason, rows_no_reason)
+
+    args2 = argparse.Namespace(output=csv_no_reason, week=None, run_record=None)
+    ret2 = cmd_show_predictions(args2)
+    assert ret2 == 1
+    err2 = capsys.readouterr().err
+    assert "missing reason for gateway" in err2
+
+
+def test_show_predictions_is_read_only(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify show-predictions NEVER mutates registry, history, model artifacts, or CSV file."""
+    rows = _make_valid_15_rows("2026-02-02")
+    csv_file = tmp_path / "preds_read_only.csv"
+    _write_csv(csv_file, rows)
+
+    reg_path = pathlib.Path("registry/active.json")
+    hist_path = pathlib.Path("registry/history.jsonl")
+    orig_reg = reg_path.read_bytes() if reg_path.exists() else None
+    orig_hist = hist_path.read_bytes() if hist_path.exists() else None
+    orig_csv = csv_file.read_bytes()
+
+    args = argparse.Namespace(output=csv_file, week="2026-02-02", run_record=None)
+    ret = cmd_show_predictions(args)
+    assert ret == 0
+
+    curr_reg = reg_path.read_bytes() if reg_path.exists() else None
+    curr_hist = hist_path.read_bytes() if hist_path.exists() else None
+    curr_csv = csv_file.read_bytes()
+
+    assert curr_reg == orig_reg, "show-predictions mutated registry/active.json"
+    assert curr_hist == orig_hist, "show-predictions mutated registry/history.jsonl"
+    assert curr_csv == orig_csv, "show-predictions mutated input CSV file"
+
+
+def test_show_predictions_provenance_verification(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Verify provenance checking against prediction run record."""
+    rows = _make_valid_15_rows("2026-02-02")
+    csv_file = tmp_path / "preds_prov.csv"
+    _write_csv(csv_file, rows)
+
+    csv_bytes = csv_file.read_bytes()
+    expected_hash = f"sha256:{hashlib.sha256(csv_bytes).hexdigest()}"
+
+    run_record_file = tmp_path / "run.json"
+    run_record_file.write_text(
+        json.dumps({
+            "model_version": "v0001",
+            "predictions_file_hash": expected_hash,
+            "week_start": "2026-02-02",
+        }),
+        encoding="utf-8",
+    )
+
+    args = argparse.Namespace(output=csv_file, week="2026-02-02", run_record=run_record_file)
+    ret = cmd_show_predictions(args)
+    assert ret == 0
+    out = capsys.readouterr().out
+    assert "LIVE PREDICTIONS" in out
+    assert "Model version:     v0001" in out
+    assert "Provenance:        PASS (matched run record)" in out
+    assert "Status:            PASS" in out
+
+
+def test_show_predictions_real_live_integration(repo_data_dir: pathlib.Path, tmp_path: pathlib.Path, capsys: pytest.CaptureFixture):
+    """Integration test: run cmd_run_live to produce real output, then show_predictions validates it."""
+    reg_file = pathlib.Path("registry/active.json")
+    models_dir = pathlib.Path("models")
+    live_csv = tmp_path / "live_out.csv"
+    run_json = tmp_path / "live_run.json"
+
+    args_live = argparse.Namespace(
+        data=repo_data_dir,
+        week="2026-02-02",
+        output=live_csv,
+        backlog_report=tmp_path / "backlog.json",
+        run_record=run_json,
+        registry=reg_file,
+        models_dir=models_dir,
+    )
+    ret_live = cmd_run_live(args_live)
+    assert ret_live == 0
+    assert live_csv.exists()
+    assert run_json.exists()
+
+    # Discard live output from capsys
+    capsys.readouterr()
+
+    # Now run show-predictions on the freshly generated live artifact
+    args_show = argparse.Namespace(
+        output=live_csv,
+        week="2026-02-02",
+        run_record=run_json,
+    )
+    ret_show = cmd_show_predictions(args_show)
+    assert ret_show == 0
+
+    out = capsys.readouterr().out
+    assert "LIVE PREDICTIONS" in out
+    assert "Model version:     v0001" in out
+    assert "Week:              2026-02-02" in out
+    assert "Row count:         15" in out
+    assert "Provenance:        PASS (matched run record)" in out
+    assert "Status:            PASS" in out
+
+    # Verify header and 15 rows rendered in table
+    lines = [line for line in out.splitlines() if line.strip()]
+    table_lines = [l for l in lines if l.startswith("   ") or l.startswith("  ") or l.startswith(" 1")]
+    assert len(table_lines) >= 15
 
 
 

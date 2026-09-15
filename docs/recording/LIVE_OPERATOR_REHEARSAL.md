@@ -65,10 +65,14 @@ The live evaluator's primary sequence is:
 make ops-status
 make ops-preflight LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
 make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
-make ops-change CANDIDATE=v0002 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-predictions LIVE_WEEK="$LIVE_WEEK"
+make ops-evaluate CANDIDATE=v0002
 make ops-change CANDIDATE=v_promotable LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
 make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-predictions LIVE_WEEK="$LIVE_WEEK"
 make ops-rollback-to VERSION=v0001 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-predictions LIVE_WEEK="$LIVE_WEEK"
 make ops-verify LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK" TARGET=v0001
 ```
 
