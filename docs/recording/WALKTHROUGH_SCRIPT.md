@@ -106,20 +106,20 @@ Conforming strictly to Challenge Brief Part 1 Section 7 and ARCHITECTURE_v25_FRE
 ### 5:45 – 7:15: Live Model Change & Atomic Rollback Verification
 - **Screen Action**: Click the **Safety** tab (`#safety`). Show the Model Lifecycle Journey and the Rollback Safety & Proof Panel. In the terminal, execute the authoritative live change sequence: `make ops-change`, `make ops-rollback-to`, and `make ops-verify`.
 - **Terminal Commands**:
-  ```bash
+  ```powershell
   # 1. Controlled demonstration of candidate promotion to fixture v_promotable
-  make ops-change CANDIDATE=v_promotable LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+  .\make ops-change CANDIDATE=v_promotable
 
   # 2. Authoritative operator rollback to restore certified baseline v0001
-  make ops-rollback-to VERSION=v0001 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+  .\make ops-rollback-to VERSION=v0001
 
   # 3. Final cryptographic verification
-  make ops-verify LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK" TARGET=v0001
+  .\make ops-verify
   ```
 - **Spoken Dialogue**:
   > *"The Safety View presents our model lifecycle journey and rollback safety proof: validated model rollback, transactional pointer safety, and deterministic replay verification.
   >
-  > To prove our rollback mechanism without violating governance rules or falsely deploying rejected candidate v0002, we execute `make ops-change` using our committed test fixture `v_promotable`.
+  > To prove our rollback mechanism without violating governance rules or falsely deploying rejected candidate v0002, we execute `make ops-change` using our committed test fixture `v_promotable`. This is the deterministic v_promotable lifecycle fixture, not evidence that v0002 should be promoted.
   >
   > Then, we execute our authoritative operator rollback: `make ops-rollback-to VERSION=v0001`.
   >
@@ -135,43 +135,73 @@ Conforming strictly to Challenge Brief Part 1 Section 7 and ARCHITECTURE_v25_FRE
 - **Screen Action**: Display `LIMITATIONS.md` Sections 1 and 5.
 - **Spoken Dialogue**:
   > *"We close with operational honesty. In `LIMITATIONS.md`, we disclose that of 332 registered gateways, exactly 12 units—3.61% of our fleet—have zero historical telemetry records. We classify them as `NO_TELEMETRY` rather than inventing calm scores.
-  > 
+  >
   > If given two additional operational weeks, our priorities are clear:
   > 1. Ingest fresh, synchronized meter-read telemetry to eliminate the 2026-01-26 snapshot lag.
   > 2. Implement dual-channel silence detection to catch complete communication blackouts before they drop into the backlog.
   > 3. Jointly optimize dispatch by weighting anomaly persistence with customer unread meter exposure.
   > 4. Audit carrier cellular SIM provisioning to bring the 12 blind-spot units online.
-  > 
-  > In conclusion: Track F delivers not just predictions, but complete lifecycle governance. The system is deterministic, defensible, and production-ready. Thank you."*
+  >
+  > In conclusion: Track F delivers not just predictions, but complete lifecycle governance. The system is deterministic, auditable, and designed for controlled operational deployment. Thank you."*
 
 ---
 
 ## Live Operator Quick-Reference Card
 
-For live evaluator interactions consuming arbitrary unseen datasets:
+### Windows / PowerShell Rehearsal & Live Evaluation
 
-```bash
-# Set evaluator environment variables
-export LIVE_DATA="/path/to/evaluator_dataset"
-export LIVE_WEEK="2026-05-04"
+For local rehearsal in Windows PowerShell:
 
-# 1. Check baseline
-make ops-status
+```powershell
+# Set local rehearsal environment variables (PowerShell)
+$env:LIVE_DATA = ".\data"
+$env:LIVE_WEEK = "2026-02-02"
 
-# 2. Safety preflight check
-make ops-preflight LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+# 1. Check certified baseline status
+.\make ops-status
+
+# 2. Safety preflight check (validates schema, telemetry, data path)
+.\make ops-preflight
 
 # 3. Live inference & prediction inspection
-make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
-make ops-predictions LIVE_WEEK="$LIVE_WEEK"
+.\make ops-live
+.\make ops-predictions
 
-# 4. Candidate evaluation (proves v0002 rejection)
-make ops-evaluate CANDIDATE=v0002
+# 4. Candidate evaluation (proves v0002 rejection on holdout)
+.\make ops-evaluate CANDIDATE=v0002
 
-# 5. Live change (staged fixture)
-make ops-change CANDIDATE=v_promotable LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+# 5. Live change demonstration (staged fixture v_promotable)
+.\make ops-change CANDIDATE=v_promotable
 
 # 6. Authoritative rollback & equality verification
-make ops-rollback-to VERSION=v0001 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
-make ops-verify LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK" TARGET=v0001
+.\make ops-rollback-to VERSION=v0001
+.\make ops-verify
+```
+
+### Unseen Evaluator Dataset (PowerShell)
+
+For an evaluator testing arbitrary unseen evaluation weeks or alternative data paths without hard-coded dates:
+
+```powershell
+# Set evaluator environment variables
+$env:LIVE_DATA = "C:\path\to\evaluator_dataset"
+$env:LIVE_WEEK = "2026-05-04"
+
+# 1. Inspect status and preflight against unseen dataset
+.\make ops-status
+.\make ops-preflight
+
+# 2. Run live inference and inspect predictions
+.\make ops-live
+.\make ops-predictions
+
+# 3. Evaluate candidate model
+.\make ops-evaluate CANDIDATE=v0002
+
+# 4. Controlled promotion of test fixture v_promotable
+.\make ops-change CANDIDATE=v_promotable
+
+# 5. Immediate rollback to certified baseline v0001 and bit-for-bit replay verification
+.\make ops-rollback-to VERSION=v0001
+.\make ops-verify
 ```
