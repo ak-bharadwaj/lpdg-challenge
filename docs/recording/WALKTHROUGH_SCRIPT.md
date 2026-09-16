@@ -9,110 +9,127 @@ Conforming strictly to Challenge Brief Part 1 Section 7 and ARCHITECTURE_v25_FRE
 
 | Timestamp | Storyline Chapter | Visual Demonstration | Operations-Manager Dialogue Focus |
 | :--- | :--- | :--- | :--- |
-| **0:00 – 1:00** | Problem & Lifecycle Governance | Terminal & Architecture Overview | Defending €45,600 truck-roll budget against unvetted black-box changes |
-| **1:00 – 2:15** | Reviewer Verification | Clean clone `make run` | 120 validated visits across 8 weeks (`validate_submission.py: OK`) |
-| **2:15 – 3:15** | Immutable Model Packages | `models/v0001/` & `models/v0002/` | `model.joblib`, dual-hash integrity (`artifact_hash` & `replay_hash`) |
-| **3:15 – 4:15** | Temporal Firewall & Schema Guard | Monday 00:00 UTC cutoff | Zero wall-clock leakage, fail-closed telemetry schema validation |
-| **4:15 – 5:15** | Multi-Window Evidence Gate | `policy.json` & Gate Evaluation | Candidate `v0002` rejection (`REJECT_GROUPED_DISAGREEMENT`), `v0001` preserved |
-| **5:15 – 6:15** | Backlog Economics | `predictions.csv` & `backlog_report.json` | 15 dispatches/week commitment, full visibility into deferred fleet risk |
-| **6:15 – 7:15** | Atomic Rollback Proof | `scripts/rollback.py` execution | Pre-validation guard, atomic pointer swap, bit-for-bit replay equality |
-| **7:15 – 8:00** | Empirical Fleet Boundaries | `LIMITATIONS.md` | Measured 12-gateway blind spot (3.61%) & two-week operational delta |
+| **0:00 – 1:00** | Problem & Lifecycle Governance | Console Header & `make ops-status` | Defending €45,600 truck-roll budget against unvetted black-box changes |
+| **1:00 – 2:15** | Reviewer Verification & Submission Pipeline | Clean clone `make run` | 120 validated visits across 8 weeks (`validate_submission.py: OK`), CSV 6-decimal storage |
+| **2:15 – 3:30** | Fleet Operations & Priority Dispatches | Console `#operations` View & `make ops-predictions` | Clean integer scores (`43`, `26`), uncompromised decision audit reasons, data health |
+| **3:30 – 4:45** | Multi-Window Evidence Gate & Rejection | Console `#governance` View & `make ops-evaluate` | Candidate `v0002` rejection (`REJECT_GROUPED_DISAGREEMENT`), holdout regression (18 vs 17), `DECISION FINAL` |
+| **4:45 – 5:45** | Backlog Fleet Risk & Deferral Intelligence | Console `#backlog` View & Deferral Inspector | 15 dispatches/week capacity ceiling, 275 deferred assets, single-pass continuity without score re-invention |
+| **5:45 – 7:15** | Live Model Change & Atomic Rollback Proof | Console `#safety` View & `make ops-change` / `ops-rollback-to` | Controlled candidate deployment, target validation, atomic pointer swap, bit-for-bit replay equality verification |
+| **7:15 – 8:00** | Empirical Fleet Boundaries & Two-Week Delta | `LIMITATIONS.md` & Production Handover | Measured 12-gateway blind spot (3.61%), honest reporting, operational roadmap |
 
 ---
 
 ## Detailed Minute-by-Minute Cue-Sheet
 
 ### 0:00 – 1:00: The Problem in One Sentence & Track F Rationale
-- **Screen Action**: Display repository root, showing `DECISIONS.md` and `MLOPS.md`.
+- **Screen Action**: Display RESQ Operations Console (`http://127.0.0.1:8080`) showing the `TRACK F • MLOps` brand badge and `ACTIVE MODEL: v0001`, alongside a terminal displaying `make ops-status`.
+- **Terminal Command**:
+  ```bash
+  make ops-status
+  ```
 - **Spoken Dialogue**:
   > *"Good morning. As an Operations Manager for LPDG, my responsibility every Monday morning is allocating our fixed technician fleet: exactly 15 truck rolls per week across 8 operational weeks, committing €45,600 in physical technician costs, while mitigating €600 weekly penalties for broken customer gateways.
-  > 
-  > We deliberately chose MLOps Architecture (Track F) over chasing novel machine learning algorithms. In field operations, deploying an uncalibrated complex model without cryptographic replay determinism, schema drift protection, or verified atomic rollback creates unacceptable service risks. Our core deliverable is total lifecycle governance: ensuring every technician dispatch is defensible, auditable, and fail-closed."*
+  >
+  > We deliberately chose MLOps Architecture (Track F) over chasing uncalibrated machine learning algorithms. In field operations, deploying a complex model without cryptographic replay determinism, schema drift protection, or verified atomic rollback creates unacceptable service risks. Our core deliverable is total lifecycle governance: ensuring every technician dispatch is defensible, auditable, and fail-closed.
+  >
+  > Running `make ops-status` establishes our certified baseline: active model is v0001, model artifact is cryptographically valid, schema contract passes, and working tree is clean."*
+
+---
 
 ### 1:00 – 2:15: Clean Clone Execution & Canonical Entry Point (`make run`)
 - **Screen Action**: In an empty terminal, clone the repository into a clean temporary directory, invoke literal `make run`, and observe output.
 - **Terminal Commands**:
   ```bash
-  git clone https://github.com/ak-bharadwaj/resq-mlops.git clean_review
+  git clone https://github.com/ak-bharadwaj/lpdg-challenge.git clean_review
   cd clean_review
   make run
   ```
 - **Spoken Dialogue**:
-  > *"To prove reproducibility to reviewers, everything runs through a single canonical command: `make run`. 
+  > *"To prove reproducibility to reviewers, everything runs through a single canonical command: `make run`.
   > 
-  > Notice what happens: in a completely clean environment without cached state, `make run` ingests telemetry through our Monday 00:00 UTC temporal firewall, ranks eligible gateways, applies our 15-visit weekly cap, generates `predictions.csv`, and executes the official challenge validator `validate_submission.py`. 
+  > Notice what happens: in a completely clean environment without cached state, `make run` ingests telemetry through our Monday 00:00 UTC temporal firewall, ranks eligible gateways, applies our 15-visit weekly cap, generates `predictions.csv`, and executes the official challenge validator `validate_submission.py`.
   > 
-  > The result is instant: exactly 120 dispatches across 8 weeks from February 2 to March 23, 2026, formatted to 6 decimals with operations-ready explanation strings under 300 characters. Result: `predictions.csv: OK`."*
+  > The result is immediate: exactly 120 dispatches across 8 weeks from February 2 to March 23, 2026, formatted to 6 decimals with operations-ready explanation strings under 300 characters. Result: `predictions.csv: OK`."*
 
-### 2:15 – 3:15: Immutable Model Packages & Dual-Hash Cryptographic Provenance
-- **Screen Action**: Inspect `models/v0001/` and `models/v0002/`, showing `model.joblib`, `manifest.json`, and `scorer_identity.txt`.
+---
+
+### 2:15 – 3:30: Operations Cockpit & Top-15 Dispatches
+- **Screen Action**: Switch browser to `#operations` view in the RESQ Operations Console (`http://127.0.0.1:8080/#operations`). Highlight the KPI strip and the uncompromised table columns. In the terminal, show `make ops-predictions`.
 - **Terminal Commands**:
   ```bash
-  ls -l models/v0001/ models/v0002/
-  cat models/v0002/manifest.json
+  make ops-predictions
   ```
 - **Spoken Dialogue**:
-  > *"Let's look under the hood at model packaging. Per Section 6 of our frozen architecture, model packages are strictly immutable. 
+  > *"Here in the Operations View of our console, the dispatch team has immediate clarity for the selected evaluation week.
   > 
-  > Every package contains `model.joblib`, `model_config.json`, `feature_schema.json`, and `scorer_identity.txt`. These four behavior-defining files are cryptographically hashed into the `artifact_hash`. Notice that attempting to retrain into an existing package directory fails closed with `PackageAlreadyExistsError`.
+  > Our KPI cards confirm 290 eligible gateways, 15 out of 15 visits allocated under the €5,700 weekly capacity ceiling, and data health verified PASS.
   > 
-  > Production runs on `v0001`, which packages our 3-sigma decision constants. Candidate `v0002` packages our deterministic multi-signal scorer, combining 3-sigma anomaly persistence with silence ratio."*
+  > Look at the dispatch priority table: notice that while the underlying submission file stores exact 6-decimal values for mathematical compliance, our operations console renders clean integer scores—such as 43, 26, 23—making priority tiers instantly legible.
+  > 
+  > Crucially, our table layout protects the operational reason column with generous horizontal space, giving technicians the exact decision audit: baseline deviation, breach metric, and hour count without cramping."*
 
-### 3:15 – 4:15: Inference Determinism, Cutoff Firewalls & Schema Drift Guards
-- **Screen Action**: Inspect `app/data/loader.py` showing `load_telemetry_window` and `app/data/schema.py`.
-- **Spoken Dialogue**:
-  > *"In field operations, data leakage is lethal. Our temporal firewall enforces a strict Monday 00:00:00 UTC cutoff: any telemetry record stamped at or after midnight is rejected prior to feature calculation. There are zero wall-clock system calls anywhere in the prediction path.
-  > 
-  > Furthermore, before any model scores a single row, the incoming telemetry is validated against `TelemetrySchemaContract`. If columns are missing or types are corrupted, or if fleet absence exceeds 50%, the pipeline trips to `BLOCK_FEATURES`, failing closed safely without emitting fabricated predictions."*
+---
 
-### 4:15 – 5:15: Multi-Window Evidence Gate & Deterministic Rejection of `v0002`
-- **Screen Action**: Display `policy.json` and show candidate evaluation results.
+### 3:30 – 4:45: Model Governance & Authoritative Rejection of `v0002`
+- **Screen Action**: Click the **Governance** tab (`#governance`). Show the verdict banner (`GATE: REJECT`, `REJECT_GROUPED_DISAGREEMENT`, `DECISION FINAL`). Click the blue **View Evidence** button to display the modal drill-down. In the terminal, run `make ops-evaluate CANDIDATE=v0002`.
 - **Terminal Commands**:
   ```bash
-  cat policy.json
-  cat registry/active.json
+  make ops-evaluate CANDIDATE=v0002
   ```
 - **Spoken Dialogue**:
-  > *"Now for the central operational decision: why did we NOT promote candidate `v0002`?
-  > 
-  > Our promotion gate is governed by a strict four-condition policy evaluated across three expanding temporal windows (November, December, January) plus an isolated grouped holdout of 59 gateways. All reported figures were dynamically recomputed from the supplied data, and we treat field visits explicitly as a selection-biased retrospective proxy rather than fleet-wide ground truth.
-  > 
-  > Under this internal retrospective cost-backtest proxy on historical development windows, `v0002` reduced missed broken weeks from 71 to 60, representing an internal €6,600 penalty savings proxy. But on the 59 held-out gateways—hardware the model had never seen—the candidate regressed, missing 18 broken weeks compared to 17 in the active model.
-  > 
-  > Under our frozen gate rule, aggregate gains cannot overwrite holdout regression. The promotion gate issued an authoritative `REJECT_GROUPED_DISAGREEMENT`. Production remained safely locked on `v0001`. Rejection is a successful lifecycle outcome."*
+  > *"Now for the central operational governance decision: why did we NOT deploy candidate model `v0002`?
+  >
+  > In the Governance View, notice the banner: `GATE: REJECT` with status `DECISION FINAL`. The candidate was NOT deployed; active model v0001 remains protected.
+  >
+  > When we open the Evidence Review drawer, we see why. Across three historical development windows—November, December, and January—v0002 reduced missed broken weeks from 71 to 60, a 15.49% improvement.
+  >
+  > However, our frozen policy enforces Section 8: an isolated grouped holdout of 59 physical gateways that the model never saw during training. On that holdout fleet, v0002 regressed, missing 18 broken weeks versus 17 under active baseline v0001.
+  >
+  > Under our governance rules, aggregate gains cannot overwrite holdout regression. The promotion gate issued an authoritative `REJECT_GROUPED_DISAGREEMENT`. Rejection here is a successful safety outcome."*
 
-### 5:15 – 6:15: Backlog Economics & Deferred Fleet Risk
-- **Screen Action**: Open `backlog_report.json` and inspect deferred ranks 16+.
+---
+
+### 4:45 – 5:45: Backlog Fleet Risk & Deferral Intelligence
+- **Screen Action**: Click the **Backlog** tab (`#backlog`). Point out the capacity allocation bar (15 Dispatched / 275 Deferred), the gateway deferral inspector, and the Single Ranked Object Continuity flow diagram.
+- **Console Action**: Click the sample chip `0639EA5602C1 (Rank 169 Deferred)` in the Gateway Deferral Inspector to demonstrate instant lookup.
+- **Spoken Dialogue**:
+  > *"Because our truck-roll budget strictly caps visits at 15 per week, what happens to gateway rank 16 and beyond?
+  >
+  > In the Backlog View, we see that 275 gateways are deferred, with 245 units exhibiting elevated risk totaling 1,523 proxy anomaly hours. Notice our data honesty principle: proxy hours represent telemetry deviation—they are never reported as realized euro savings.
+  >
+  > The Gateway Deferral Inspector allows dispatch planners to audit any gateway. Clicking rank 169 shows it was deferred due to capacity rationing, not absence of anomalies.
+  >
+  > At the bottom, our Single Ranked Object Continuity diagram highlights Rule 9A: a single scoring pass feeds both `predictions.csv` and `backlog_report.json`. Neither output independently re-scores or invents data."*
+
+---
+
+### 5:45 – 7:15: Live Model Change & Atomic Rollback Verification
+- **Screen Action**: Click the **Safety** tab (`#safety`). Show the Model Lifecycle Journey and the Rollback Safety & Proof Panel. In the terminal, execute the authoritative live change sequence: `make ops-change`, `make ops-rollback-to`, and `make ops-verify`.
 - **Terminal Commands**:
   ```bash
-  cat backlog_report.json | head -n 30
+  # 1. Controlled demonstration of candidate promotion to fixture v_promotable
+  make ops-change CANDIDATE=v_promotable LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+
+  # 2. Authoritative operator rollback to restore certified baseline v0001
+  make ops-rollback-to VERSION=v0001 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+
+  # 3. Final cryptographic verification
+  make ops-verify LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK" TARGET=v0001
   ```
 - **Spoken Dialogue**:
-  > *"Because our operational budget strictly caps technician visits at 15 per week, what happens to gateway rank 16 that is also showing signs of failure?
-  > 
-  > We never drop high-risk gateways into the dark. All candidates ranked 16 and above are captured in `backlog_report.json`. Operations planners can see the exact deferred risk exposure—for example, in week 1, 275 gateways are deferred, with 245 units exhibiting elevated risk scores totaling 1,523 proxy anomaly hours.
-  > 
-  > This gives dispatch managers the business justification to request emergency overtime or reallocate regional contractor capacity."*
+  > *"The Safety View presents our model lifecycle journey and rollback safety proof: validated model rollback, transactional pointer safety, and deterministic replay verification.
+  >
+  > To prove our rollback mechanism without violating governance rules or falsely deploying rejected candidate v0002, we execute `make ops-change` using our committed test fixture `v_promotable`.
+  >
+  > Then, we execute our authoritative operator rollback: `make ops-rollback-to VERSION=v0001`.
+  >
+  > Observe the terminal proof:
+  > 1. Target Validation: Package v0001 is validated before touching the registry.
+  > 2. Atomic Pointer Switch: Swaps `registry/active.json` atomically in under 1 millisecond.
+  > 3. Replay Equality Proof: Runs inference and proves bit-for-bit replay hash equality against the baseline checkpoint.
+  > 4. Verified Restoration: Running `make ops-verify` confirms active model is restored to v0001 and output matches byte-for-byte."*
 
-### 6:15 – 7:15: Atomic Rollback Demonstration with Bit-for-Bit Replay Proof (`v_promotable` → `v0001`)
-- **Screen Action**: Run `python scripts/rollback.py` in the terminal.
-- **Terminal Commands**:
-  ```bash
-  python scripts/rollback.py
-  ```
-- **Spoken Dialogue**:
-  > *"Because candidate `v0002` was legitimately rejected by our promotion gate, production remained safely anchored on `v0001`. To demonstrate our atomic rollback machinery without violating governance rules or falsely deploying an unvetted candidate, the architecture includes a committed deterministic fixture: `v_promotable`.
-  > 
-  > When we invoke `scripts/rollback.py`, it executes our canonical rollback rehearsal: rolling back from active `v_promotable` to restore baseline `v0001`.
-  > 
-  > Notice the five-point safety lifecycle:
-  > 1. Target Validation: It validates target package `v0001` before touching the registry, verifying manifest integrity, config schemas, and cryptographic `artifact_hash`.
-  > 2. Pre-Rollback Hash: It captures the current active replay hash.
-  > 3. Atomic Switch: It swaps `registry/active.json` via an atomic filesystem call in less than 1 millisecond.
-  > 4. Replay Proof: It runs post-switch prediction and proves bit-for-bit deterministic replay equality against the expected baseline prediction hash.
-  > 5. Active Restored: Registry state confirms `v0001` is restored. Replay equality: PASS."*
-
-*(For interactive live evaluator sessions consuming arbitrary unseen-month data handed over by evaluators, see the step-by-step operator commands in [`docs/recording/LIVE_OPERATOR_REHEARSAL.md`](file:///c:/Users/dorni/OneDrive/Desktop/lpdg/docs/recording/LIVE_OPERATOR_REHEARSAL.md)).*
+---
 
 ### 7:15 – 8:00: Empirical Fleet Boundaries & Two-Week Operational Delta
 - **Screen Action**: Display `LIMITATIONS.md` Sections 1 and 5.
@@ -125,6 +142,36 @@ Conforming strictly to Challenge Brief Part 1 Section 7 and ARCHITECTURE_v25_FRE
   > 3. Jointly optimize dispatch by weighting anomaly persistence with customer unread meter exposure.
   > 4. Audit carrier cellular SIM provisioning to bring the 12 blind-spot units online.
   > 
-  > Thank you. The repository is clean, deterministic, and fully auditable."*
+  > In conclusion: Track F delivers not just predictions, but complete lifecycle governance. The system is deterministic, defensible, and production-ready. Thank you."*
 
 ---
+
+## Live Operator Quick-Reference Card
+
+For live evaluator interactions consuming arbitrary unseen datasets:
+
+```bash
+# Set evaluator environment variables
+export LIVE_DATA="/path/to/evaluator_dataset"
+export LIVE_WEEK="2026-05-04"
+
+# 1. Check baseline
+make ops-status
+
+# 2. Safety preflight check
+make ops-preflight LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+
+# 3. Live inference & prediction inspection
+make ops-live LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-predictions LIVE_WEEK="$LIVE_WEEK"
+
+# 4. Candidate evaluation (proves v0002 rejection)
+make ops-evaluate CANDIDATE=v0002
+
+# 5. Live change (staged fixture)
+make ops-change CANDIDATE=v_promotable LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+
+# 6. Authoritative rollback & equality verification
+make ops-rollback-to VERSION=v0001 LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK"
+make ops-verify LIVE_DATA="$LIVE_DATA" LIVE_WEEK="$LIVE_WEEK" TARGET=v0001
+```
