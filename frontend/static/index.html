@@ -5,340 +5,540 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RESQ Operations Console</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="ux_shell.css">
 </head>
 <body>
-  <div class="console-container">
+  <div class="console-app">
     
-    <!-- 1. Header & Navigation -->
-    <header class="console-header">
-      <div class="brand-section">
-        <div class="brand-icon">RQ</div>
-        <div>
-          <h1 class="brand-title">RESQ Operations Console</h1>
-          <p class="brand-subtitle">Technician Allocation & Fault Mitigation Engine</p>
+    <!-- 1. Header & Active Model Badge -->
+    <header class="app-header">
+      <div class="app-brand">
+        <div class="app-brand-icon">RQ</div>
+        <div class="app-brand-title">
+          <span>RESQ Operations Console</span>
+          <span class="app-brand-badge">MLOps v25</span>
         </div>
       </div>
-      <div class="header-status">
-        <span class="info-label" style="font-size: 12px;">ACTIVE MODEL:</span>
+      <div class="app-header-status">
+        <span class="info-label" style="font-size: 11px;">ACTIVE MODEL:</span>
         <span id="active-model-badge" class="status-pill pill-active">LOADING...</span>
       </div>
     </header>
 
-    <!-- 2. KPI Summary Strip -->
-    <section class="kpi-strip" aria-label="Key Performance Indicators">
-      <div class="kpi-card">
-        <div class="kpi-label">Evaluation Week</div>
-        <div class="kpi-value" id="kpi-week">--</div>
-        <div class="kpi-subtext" id="kpi-week-sub">Scored Period (Monday 00:00 UTC)</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Fleet Eligibility</div>
-        <div class="kpi-value" id="kpi-fleet">--</div>
-        <div class="kpi-subtext" id="kpi-fleet-sub">Master Ingestion & Date Filter</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Weekly Capacity</div>
-        <div class="kpi-value" id="kpi-capacity">--</div>
-        <div class="kpi-subtext" id="kpi-capacity-sub">15 visits @ €380/visit (€5,700/wk)</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Data Health</div>
-        <div class="kpi-value" id="kpi-health">--</div>
-        <div class="kpi-subtext" id="kpi-health-sub">Telemetry Schema & Completeness</div>
-      </div>
-    </section>
+    <div class="app-body">
 
-    <!-- 3. Dispatch Priority Table Section -->
-    <section class="card-section" aria-label="Dispatch Priority Table">
-      <div class="section-header">
-        <div class="section-title">
-          <span>⚡</span>
-          <span>Dispatch Priority (Top 15 Allocated Visits)</span>
+      <!-- Persistent Sidebar Navigation -->
+      <aside class="app-sidebar" role="navigation" aria-label="Console Navigation">
+        <div>
+          <div class="nav-section-label">Operational Views</div>
+          <nav class="nav-menu" role="tablist">
+            <a class="nav-item active" data-target="view-operations" role="tab" aria-selected="true" href="#operations">
+              <span class="nav-icon">⚡</span>
+              <span class="nav-text">Operations</span>
+              <span class="nav-badge-pill">Top 15</span>
+            </a>
+            <a class="nav-item" data-target="view-governance" role="tab" aria-selected="false" href="#governance">
+              <span class="nav-icon">⚖️</span>
+              <span class="nav-text">Governance</span>
+              <span class="nav-badge-pill">Gate</span>
+            </a>
+            <a class="nav-item" data-target="view-backlog" role="tab" aria-selected="false" href="#backlog">
+              <span class="nav-icon">📋</span>
+              <span class="nav-text">Backlog</span>
+              <span class="nav-badge-pill">Ranks 16+</span>
+            </a>
+            <a class="nav-item" data-target="view-safety" role="tab" aria-selected="false" href="#safety">
+              <span class="nav-icon">🛡️</span>
+              <span class="nav-text">Safety</span>
+              <span class="nav-badge-pill">Rollback</span>
+            </a>
+          </nav>
         </div>
-        <div class="week-selector-wrapper">
-          <label for="week-select" class="info-label">Week:</label>
-          <select id="week-select" class="select-control" aria-label="Select Evaluation Week">
-            <option value="">Loading weeks...</option>
-          </select>
-        </div>
-      </div>
-      <div class="table-responsive">
-        <table class="dispatch-table">
-          <thead>
-            <tr>
-              <th style="width: 70px;">Rank</th>
-              <th style="width: 170px;">Gateway ID</th>
-              <th style="width: 110px;">Risk Score</th>
-              <th>Operational Reason (Decision Audit)</th>
-            </tr>
-          </thead>
-          <tbody id="dispatch-tbody">
-            <tr>
-              <td colspan="4" class="empty-state">Loading dispatch priority rows...</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
 
-    <!-- 4. Split Panels: Governance & Data Health -->
-    <!-- 4. Split Panels: Governance Centerpiece & Operations Support -->
-    <div class="split-grid">
-      
-      <!-- Panel A: Model Governance (Compact) -->
-      <section class="card-section" aria-label="Model Governance">
-        <div class="section-header">
-          <div class="section-title">
-            <span>⚖️</span>
-            <span>Model Governance & Promotion Gate</span>
-          </div>
-          <span class="status-pill pill-unavailable" id="gov-header-status">EVALUATING...</span>
-        </div>
-        <div class="panel-content">
-          <div class="governance-verdict-banner unavailable" id="gov-verdict-banner">
-            <div class="verdict-tag-row">
-              <span class="status-pill pill-unavailable" id="gov-verdict-pill">GATE: EVALUATING...</span>
-              <span class="verdict-reason-code" id="gov-verdict-code">--</span>
-            </div>
-            <div class="final-gate-statement">
-              <strong id="final-gate-deployment" style="color: var(--text-dim);">Checking deployment...</strong> —
-              <span id="final-gate-protection">Checking active model status...</span>
-            </div>
-            <div class="verdict-summary" id="gov-verdict-summary">
-              Loading promotion audit summary...
-            </div>
-            <div class="info-row" style="margin-top: 4px; border-bottom: none;">
-              <span class="info-label">Promotion Gate Rule:</span>
-              <span class="info-value" id="gov-rule" style="font-size: 11px; color: var(--text-dim);">≥10% Cost Diff & Holdout Agreement</span>
-            </div>
-          </div>
-          
-          <div class="info-row">
-            <span class="info-label">Active Model:</span>
-            <span class="info-value" id="gov-active">--</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Candidate Model:</span>
-            <span class="info-value" id="gov-candidate">--</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Temporal Improvement:</span>
-            <span class="info-value" id="gov-improvement">--</span>
-          </div>
-          <div class="info-row" style="border-bottom: none;">
-            <span class="info-label">Unseen Fleet Holdout:</span>
-            <span class="info-value" id="gov-holdout">--</span>
-          </div>
-
-          <div style="margin-top: 10px;">
-            <button id="open-evidence-btn" class="btn-evidence-review" type="button">
-              🔍 View Evidence
-            </button>
+        <div class="sidebar-footer">
+          <div class="sidebar-meta-card">
+            <div style="font-weight: 600; color: var(--text-muted);">LPDG Challenge 2026</div>
+            <div>Track F: MLOps Governance</div>
+            <div style="margin-top: 4px; color: var(--text-dim);">Weekly Cap: 15 visits (€5,700)</div>
           </div>
         </div>
-      </section>
+      </aside>
 
-      <!-- Panel B: Right Column (Data Health & Evidence Credibility) -->
-      <div class="support-column">
-        
-        <!-- Data Health & Completeness Guards -->
-        <section class="card-section" aria-label="Data Health & Guards">
-          <div class="section-header">
-            <div class="section-title">
-              <span>🛡️</span>
-              <span>Data Health & Completeness Guards</span>
-            </div>
-          </div>
-          <div class="panel-content">
-            <div class="info-row">
-              <span class="info-label">Telemetry Schema:</span>
-              <span class="info-value" id="health-schema">--</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Source Completeness:</span>
-              <span class="info-value" id="health-completeness">--</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Fleet Absence Rate:</span>
-              <span class="info-value" id="health-absence">--</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Reporting Gateways:</span>
-              <span class="info-value" id="health-reporting">--</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Invariant Protection:</span>
-              <span class="info-value" id="health-invariants">--</span>
-            </div>
-            <div class="callout-box info" id="health-callout">
-              Telemetry ingestion firewall active. Evaluator cutoff Monday 00:00:00 UTC enforced across all partitions.
-            </div>
-          </div>
-        </section>
+      <!-- Main Workspace (Independently Scrollable per view) -->
+      <main class="app-workspace">
 
-        <!-- Evidence-Quality Indicator -->
-        <section class="card-section" aria-label="Evidence Credibility Matrix">
-          <div class="section-header">
-            <div class="section-title">
-              <span>📊</span>
-              <span>Evidence Quality</span>
-            </div>
-          </div>
-          <div class="panel-content">
-            <div class="quality-item">
-              <div class="quality-header-row">
-                <span class="quality-name">Development</span>
-                <span class="quality-field-val" id="quality-dev-windows">--</span>
+        <!-- ===============================================================
+             VIEW 1: OPERATIONS
+             =============================================================== -->
+        <div id="view-operations" class="console-view active" role="tabpanel" aria-label="Operations View">
+          <div class="view-header">
+            <div class="view-header-main">
+              <div class="view-title-row">
+                <span style="font-size: 20px;">⚡</span>
+                <h2 class="view-title">Fleet Operations & Priority Dispatches</h2>
               </div>
-              <div class="quality-desc">Temporal backtest over historical rolling windows</div>
+              <p class="view-executive-summary">
+                Weekly technician visit allocation, fleet eligibility filtering, and top-15 anomaly dispatch priority under the €5,700/week capacity ceiling.
+              </p>
             </div>
-
-            <div class="quality-item">
-              <div class="quality-header-row">
-                <span class="quality-name">Holdout</span>
-                <span class="quality-field-val" id="quality-holdout">--</span>
-              </div>
-              <div class="quality-desc">Physically isolated hardware evaluation on unseen gateways</div>
-            </div>
-
-            <div class="quality-item">
-              <div class="quality-header-row">
-                <span class="quality-name">Fleet-Wide Ground Truth</span>
-                <span class="status-pill pill-unavailable" id="quality-fleet-truth">NOT AVAILABLE</span>
-              </div>
-              <div class="quality-desc">Production labels do not exist post-cutoff; truthful nullability strictly enforced</div>
+            <div class="week-selector-wrapper">
+              <label for="week-select" class="info-label">Week:</label>
+              <select id="week-select" class="select-control" aria-label="Select Evaluation Week">
+                <option value="">Loading weeks...</option>
+              </select>
             </div>
           </div>
-        </section>
 
-      </div>
+          <div class="view-grid-stack">
+            <!-- 2. KPI Summary Strip -->
+            <section class="kpi-strip" aria-label="Key Performance Indicators">
+              <div class="kpi-card">
+                <div class="kpi-label">Evaluation Week</div>
+                <div class="kpi-value" id="kpi-week">--</div>
+                <div class="kpi-subtext" id="kpi-week-sub">Scored Period (Monday 00:00 UTC)</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Fleet Eligibility</div>
+                <div class="kpi-value" id="kpi-fleet">--</div>
+                <div class="kpi-subtext" id="kpi-fleet-sub">Master Ingestion & Date Filter</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Weekly Capacity</div>
+                <div class="kpi-value" id="kpi-capacity">--</div>
+                <div class="kpi-subtext" id="kpi-capacity-sub">15 visits @ €380/visit (€5,700/wk)</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Data Health</div>
+                <div class="kpi-value" id="kpi-health">--</div>
+                <div class="kpi-subtext" id="kpi-health-sub">Telemetry Schema & Completeness</div>
+              </div>
+            </section>
 
+            <!-- 3. Dispatch Priority Table Section -->
+            <section class="card-section" aria-label="Dispatch Priority Table">
+              <div class="section-header">
+                <div class="section-title">
+                  <span>⚡</span>
+                  <span>Dispatch Priority (Top 15 Allocated Visits)</span>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="dispatch-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 70px;">Rank</th>
+                      <th style="width: 170px;">Gateway ID</th>
+                      <th style="width: 110px;">Risk Score</th>
+                      <th>Operational Reason (Decision Audit)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dispatch-tbody">
+                    <tr>
+                      <td colspan="4" class="empty-state">Loading dispatch priority rows...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Data Health & Completeness Guards -->
+            <section class="card-section" aria-label="Data Health & Guards">
+              <div class="section-header">
+                <div class="section-title">
+                  <span>🛡️</span>
+                  <span>Data Health & Completeness Guards</span>
+                </div>
+              </div>
+              <div class="panel-content">
+                <div class="split-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 0;">
+                  <div>
+                    <div class="info-row">
+                      <span class="info-label">Telemetry Schema:</span>
+                      <span class="info-value" id="health-schema">--</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Source Completeness:</span>
+                      <span class="info-value" id="health-completeness">--</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Fleet Absence Rate:</span>
+                      <span class="info-value" id="health-absence">--</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="info-row">
+                      <span class="info-label">Reporting Gateways:</span>
+                      <span class="info-value" id="health-reporting">--</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Invariant Protection:</span>
+                      <span class="info-value" id="health-invariants">--</span>
+                    </div>
+                    <div class="info-row" style="border-bottom: none;">
+                      <span class="info-label">Temporal Firewall:</span>
+                      <span class="info-value" style="color: var(--success); font-weight: 500;">Monday 00:00:00 UTC</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="callout-box info" id="health-callout" style="margin-top: 12px;">
+                  Telemetry ingestion firewall active. Evaluator cutoff Monday 00:00:00 UTC enforced across all partitions.
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- ===============================================================
+             VIEW 2: GOVERNANCE
+             =============================================================== -->
+        <div id="view-governance" class="console-view" role="tabpanel" aria-label="Governance View" hidden>
+          <div class="view-header">
+            <div class="view-header-main">
+              <div class="view-title-row">
+                <span style="font-size: 20px;">⚖️</span>
+                <h2 class="view-title">Model Governance & Promotion Gate</h2>
+              </div>
+              <p class="view-executive-summary">
+                Authoritative candidate evaluation against frozen cost reduction (≥10%) and unseen fleet holdout agreement rules.
+              </p>
+            </div>
+            <div>
+              <button id="open-evidence-btn" class="btn-evidence-review" type="button">
+                🔍 View Evidence
+              </button>
+            </div>
+          </div>
+
+          <div class="view-grid-stack">
+            <!-- Governance Verdict Banner -->
+            <div class="governance-verdict-banner unavailable" id="gov-verdict-banner">
+              <div class="verdict-tag-row">
+                <span class="status-pill pill-unavailable" id="gov-verdict-pill">GATE: EVALUATING...</span>
+                <span class="verdict-reason-code" id="gov-verdict-code">--</span>
+                <span class="status-pill pill-unavailable" id="gov-header-status" style="margin-left: auto;">EVALUATING...</span>
+              </div>
+              <div class="final-gate-statement" style="margin-top: 8px;">
+                <strong id="final-gate-deployment" style="color: var(--text-dim);">Checking deployment...</strong> —
+                <span id="final-gate-protection">Checking active model status...</span>
+              </div>
+              <div class="verdict-summary" id="gov-verdict-summary" style="margin-top: 6px;">
+                Loading promotion audit summary...
+              </div>
+              <div class="info-row" style="margin-top: 8px; border-bottom: none; padding-bottom: 0;">
+                <span class="info-label">Promotion Gate Rule:</span>
+                <span class="info-value" id="gov-rule" style="font-size: 11px; color: var(--text-dim);">≥10% Cost Diff & Holdout Agreement</span>
+              </div>
+            </div>
+
+            <!-- Model Comparison & Evidence Quality Split -->
+            <div class="split-grid">
+              <!-- Panel A: Model Specs & Gate Comparison -->
+              <section class="card-section" aria-label="Model Comparison">
+                <div class="section-header">
+                  <div class="section-title">
+                    <span>⚙️</span>
+                    <span>Model Identity & Gate Comparison</span>
+                  </div>
+                </div>
+                <div class="panel-content">
+                  <div class="info-row">
+                    <span class="info-label">Active Model:</span>
+                    <span class="info-value" id="gov-active">--</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Candidate Model:</span>
+                    <span class="info-value" id="gov-candidate">--</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Temporal Improvement:</span>
+                    <span class="info-value" id="gov-improvement">--</span>
+                  </div>
+                  <div class="info-row" style="border-bottom: none;">
+                    <span class="info-label">Unseen Fleet Holdout:</span>
+                    <span class="info-value" id="gov-holdout">--</span>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Panel B: Evidence Quality Matrix -->
+              <section class="card-section" aria-label="Evidence Credibility Matrix">
+                <div class="section-header">
+                  <div class="section-title">
+                    <span>📊</span>
+                    <span>Evidence Quality</span>
+                  </div>
+                </div>
+                <div class="panel-content">
+                  <div class="quality-item">
+                    <div class="quality-header-row">
+                      <span class="quality-name">Development</span>
+                      <span class="quality-field-val" id="quality-dev-windows">--</span>
+                    </div>
+                    <div class="quality-desc">Temporal backtest over historical rolling windows</div>
+                  </div>
+
+                  <div class="quality-item">
+                    <div class="quality-header-row">
+                      <span class="quality-name">Holdout</span>
+                      <span class="quality-field-val" id="quality-holdout">--</span>
+                    </div>
+                    <div class="quality-desc">Physically isolated hardware evaluation on unseen gateways</div>
+                  </div>
+
+                  <div class="quality-item">
+                    <div class="quality-header-row">
+                      <span class="quality-name">Fleet-Wide Ground Truth</span>
+                      <span class="status-pill pill-unavailable" id="quality-fleet-truth">NOT AVAILABLE</span>
+                    </div>
+                    <div class="quality-desc">Production labels do not exist post-cutoff; truthful nullability strictly enforced</div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===============================================================
+             VIEW 3: BACKLOG
+             =============================================================== -->
+        <div id="view-backlog" class="console-view" role="tabpanel" aria-label="Backlog View" hidden>
+          <div class="view-header">
+            <div class="view-header-main">
+              <div class="view-title-row">
+                <span style="font-size: 20px;">📋</span>
+                <h2 class="view-title">Backlog Fleet Risk & Deferral Intelligence</h2>
+              </div>
+              <p class="view-executive-summary">
+                Monitored fleet assets deferred beyond the 15-visit capacity ceiling (€5,700/week), maintaining visibility into unresolved risk.
+              </p>
+            </div>
+            <div>
+              <button id="open-backlog-btn" class="btn-evidence-review" type="button">
+                📋 Inspect Backlog & Deferrals
+              </button>
+            </div>
+          </div>
+
+          <div class="view-grid-stack">
+            <!-- 5. Backlog Strip -->
+            <section class="backlog-banner" aria-label="Backlog Fleet Risk">
+              <div class="backlog-header-group">
+                <div class="kpi-label" style="color: #fca5a5;">BACKLOG FLEET RISK (RANKS 16+)</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                  Gateways deferred due to 15-visit weekly capacity limit (€5,700/wk ceiling)
+                </div>
+                <div class="backlog-allocation-container">
+                  <div class="allocation-bar-labels">
+                    <span id="alloc-label-dispatched">15 Dispatched (100% capacity)</span>
+                    <span id="alloc-label-deferred">-- Deferred (Ranks 16+)</span>
+                  </div>
+                  <div class="allocation-bar-track">
+                    <div class="alloc-fill-dispatched" id="alloc-bar-dispatched" style="width: 0%;"></div>
+                    <div class="alloc-fill-deferred" id="alloc-bar-deferred" style="width: 0%;"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="backlog-stats-group">
+                <div class="backlog-stats">
+                  <div class="backlog-stat-item">
+                    <span class="backlog-stat-number" id="backlog-deferred">--</span>
+                    <span class="info-label">Deferred</span>
+                  </div>
+                  <div class="backlog-stat-item">
+                    <span class="backlog-stat-number" id="backlog-high-risk">--</span>
+                    <span class="info-label">Elevated Risk</span>
+                  </div>
+                  <div class="backlog-stat-item">
+                    <span class="backlog-stat-number" id="backlog-proxy-hours">--</span>
+                    <span class="info-label">Proxy Hours</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Gateway Deferral Inspector Card -->
+            <div class="evidence-section-card">
+              <div class="evidence-section-header">
+                <div>
+                  <div class="evidence-section-title">GATEWAY DEFERRAL INSPECTOR</div>
+                  <div class="evidence-subtitle">Inspect individual gateway disposition and deferral rationale</div>
+                </div>
+                <span class="status-pill pill-pass">OPERATIONAL AUDIT</span>
+              </div>
+              <div class="holdout-review-body">
+                <div style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">
+                  Enter a 12-hex Gateway ID to verify if it was allocated a technician visit or deferred to the backlog due to the 15-visit limit.
+                </div>
+                <div class="inspector-form-row">
+                  <input type="text" id="backlog-lookup-input" class="inspector-input" placeholder="e.g. 0639EA5602C1" maxlength="17" />
+                  <button type="button" id="backlog-lookup-btn" class="btn-evidence-review" style="padding: 9px 18px;">Inspect Gateway</button>
+                </div>
+                <div class="inspector-chips-row">
+                  <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Quick Inspect:</span>
+                  <button type="button" class="chip-btn" data-gw="0A2778A31BE3">0A2778A31BE3 (Rank 1 Dispatched)</button>
+                  <button type="button" class="chip-btn" data-gw="0639EA5602C1">0639EA5602C1 (Rank 169 Deferred)</button>
+                  <button type="button" class="chip-btn" data-gw="023AD5204E1C">023AD5204E1C (Ineligible Fleet Member)</button>
+                </div>
+                <div id="backlog-lookup-result" class="lookup-result-box">
+                  <div style="color: var(--text-muted);">Enter a gateway ID above or click a quick sample to inspect its disposition.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Single Ranked Object Continuity Proof (Rule 9A) -->
+            <div class="evidence-section-card">
+              <div class="evidence-section-header">
+                <div>
+                  <div class="evidence-section-title">SINGLE RANKED OBJECT CONTINUITY (RULE 9A)</div>
+                  <div class="evidence-subtitle">Pipeline architecture: one scoring pass feeds both dispatches and backlog</div>
+                </div>
+                <span class="status-pill pill-pass">DESIGN INVARIANT</span>
+              </div>
+              <div class="holdout-review-body">
+                <div class="pipeline-continuity-flow">
+                  <div class="continuity-step">
+                    <div class="continuity-pill">1. Eligible Fleet</div>
+                    <div class="continuity-desc">Master filtering + UTC cutoff produces eligible gateway pool (e.g. 290 units)</div>
+                  </div>
+                  <div class="continuity-arrow">➔</div>
+                  <div class="continuity-step">
+                    <div class="continuity-pill">2. Single Scoring Pass</div>
+                    <div class="continuity-desc">Scorer ranks all eligible units by score descending, breaking ties by canonical ID</div>
+                  </div>
+                  <div class="continuity-arrow">➔</div>
+                  <div class="continuity-step">
+                    <div class="continuity-pill" style="border-color: #3b82f6;">3. Ranks 1–15 Dispatched</div>
+                    <div class="continuity-desc">Top 15 written strictly to predictions.csv (€5,700 technician commitment)</div>
+                  </div>
+                  <div class="continuity-arrow">➔</div>
+                  <div class="continuity-step">
+                    <div class="continuity-pill" style="border-color: #f59e0b;">4. Ranks 16+ Deferred</div>
+                    <div class="continuity-desc">Remaining units written directly to backlog_report.json without re-scoring</div>
+                  </div>
+                </div>
+                <div class="callout-box info" style="margin-top: 12px; font-size: 12px;">
+                  <strong>Architecture Invariant:</strong> Neither output recomputes scores, rankings, or eligibility independently. Complete mathematical continuity is preserved across both artifacts.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===============================================================
+             VIEW 4: SAFETY
+             =============================================================== -->
+        <div id="view-safety" class="console-view" role="tabpanel" aria-label="Safety View" hidden>
+          <div class="view-header">
+            <div class="view-header-main">
+              <div class="view-title-row">
+                <span style="font-size: 20px;">🛡️</span>
+                <h2 class="view-title">MLOps Lifecycle & Rollback Safety Proof</h2>
+              </div>
+              <p class="view-executive-summary">
+                Cryptographic proof of zero-risk model transitions, transactional pointer safety, and instantaneous replay equality verification.
+              </p>
+            </div>
+          </div>
+
+          <div class="view-grid-stack">
+            <!-- 6. Lifecycle & Rollback Section (Split: Visual Timeline & Safety Panel) -->
+            <div class="split-grid" style="grid-template-columns: 1fr 1fr;">
+
+              <!-- Visual Lifecycle Timeline -->
+              <section class="card-section" aria-label="Visual Lifecycle Timeline">
+                <div class="section-header">
+                  <div class="section-title">
+                    <span>🔄</span>
+                    <span>Model Lifecycle Journey</span>
+                  </div>
+                </div>
+                <div class="panel-content" style="justify-content: center;">
+                  <div class="lifecycle-timeline-container" id="lifecycle-timeline">
+                    <div class="timeline-step">
+                      <div class="timeline-pill pill-unavailable" id="flow-candidate">-- CANDIDATE</div>
+                      <div class="timeline-sub">Candidate Model</div>
+                    </div>
+                    <div class="timeline-connector">➔</div>
+                    <div class="timeline-step">
+                      <div class="timeline-pill pill-safe">EVIDENCE GATE</div>
+                      <div class="timeline-sub">3 Windows + Holdout</div>
+                    </div>
+                    <div class="timeline-connector">➔</div>
+                    <div class="timeline-step">
+                      <div class="timeline-pill pill-unavailable" id="flow-gate">EVALUATION GATE</div>
+                      <div class="timeline-sub">Gate Assessment</div>
+                    </div>
+                    <div class="timeline-connector">➔</div>
+                    <div class="timeline-step">
+                      <div class="timeline-pill pill-unavailable" id="flow-restored">-- ACTIVE</div>
+                      <div class="timeline-sub">Production Model</div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Rollback Safety & Proof Panel -->
+              <section class="card-section" id="rollback-panel" aria-label="Rollback Safety Properties">
+                <div class="section-header">
+                  <div class="section-title">
+                    <span>⏪</span>
+                    <span>Rollback Safety & Proof Panel</span>
+                  </div>
+                  <span id="rollback-status-badge" class="status-pill pill-unavailable">CHECKING...</span>
+                </div>
+                <div class="panel-content">
+                  <div class="rollback-properties-grid">
+                    <div class="rb-prop-row">
+                      <span class="info-label">Target Validation:</span>
+                      <span class="info-value" id="rollback-target-val">
+                        <span class="status-pill pill-unavailable">UNAVAILABLE</span>
+                      </span>
+                    </div>
+                    <div class="rb-prop-row">
+                      <span class="info-label">Atomic Pointer Switch:</span>
+                      <span class="info-value" id="rollback-atomic-switch">
+                        <span class="status-pill pill-unavailable">UNAVAILABLE</span>
+                      </span>
+                    </div>
+                    <div class="rb-prop-row">
+                      <span class="info-label">Replay Equality:</span>
+                      <span class="info-value" id="rollback-replay-eq">
+                        <span class="status-pill pill-unavailable">UNAVAILABLE</span>
+                      </span>
+                    </div>
+                    <div class="rb-prop-row">
+                      <span class="info-label">Restored Version:</span>
+                      <span class="info-value" id="rollback-restored-ver">
+                        <span class="status-pill pill-unavailable">UNAVAILABLE</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="callout-box info" id="rollback-reason" style="font-size: 12px; margin-top: 4px;">
+                    Deterministic replay provenance verified via transactional pointer restoration.
+                  </div>
+                  <div id="lifecycle-replay" style="display: none;"></div>
+                </div>
+              </section>
+            </div>
+
+            <!-- Read-Only Safety Banner -->
+            <div class="callout-box" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="color: #6ee7b7;">READ-ONLY AUDIT LAYER:</strong>
+                <span style="color: var(--text-dim); margin-left: 6px;">This console provides operational visibility into model prioritization and backlog risk. Zero dispatch mutations or truck-roll overrides are permitted.</span>
+              </div>
+              <span class="status-pill pill-safe">NON-MUTATING</span>
+            </div>
+          </div>
+        </div>
+
+      </main>
     </div>
 
-    <!-- 5. Backlog Strip -->
-    <section class="backlog-banner" aria-label="Backlog Fleet Risk">
-      <div class="backlog-header-group">
-        <div class="kpi-label" style="color: #fca5a5;">BACKLOG FLEET RISK (RANKS 16+)</div>
-        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
-          Gateways deferred due to 15-visit weekly capacity limit (€5,700/wk ceiling)
-        </div>
-        <div class="backlog-allocation-container">
-          <div class="allocation-bar-labels">
-            <span id="alloc-label-dispatched">15 Dispatched (100% capacity)</span>
-            <span id="alloc-label-deferred">-- Deferred (Ranks 16+)</span>
-          </div>
-          <div class="allocation-bar-track">
-            <div class="alloc-fill-dispatched" id="alloc-bar-dispatched" style="width: 5%;"></div>
-            <div class="alloc-fill-deferred" id="alloc-bar-deferred" style="width: 95%;"></div>
-          </div>
-        </div>
-      </div>
-      <div class="backlog-stats-group">
-        <div class="backlog-stats">
-          <div class="backlog-stat-item">
-            <span class="backlog-stat-number" id="backlog-deferred">--</span>
-            <span class="info-label">Deferred</span>
-          </div>
-          <div class="backlog-stat-item">
-            <span class="backlog-stat-number" id="backlog-high-risk">--</span>
-            <span class="info-label">Elevated Risk</span>
-          </div>
-          <div class="backlog-stat-item">
-            <span class="backlog-stat-number" id="backlog-proxy-hours">--</span>
-            <span class="info-label">Proxy Hours</span>
-          </div>
-        </div>
-        <div style="margin-left: 15px;">
-          <button id="open-backlog-btn" class="btn-evidence-review" type="button">
-            📋 Inspect Backlog & Deferrals
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- 6. Lifecycle & Rollback Section (Split: Visual Timeline & Safety Panel) -->
-    <div class="split-grid" style="grid-template-columns: 1fr 1fr;">
-      
-      <!-- Visual Lifecycle Timeline -->
-      <section class="card-section" aria-label="Visual Lifecycle Timeline">
-        <div class="section-header">
-          <div class="section-title">
-            <span>🔄</span>
-            <span>Model Lifecycle Journey</span>
-          </div>
-        </div>
-        <div class="panel-content" style="justify-content: center;">
-          <div class="lifecycle-timeline-container" id="lifecycle-timeline">
-            <div class="timeline-step">
-              <div class="timeline-pill pill-unavailable" id="flow-candidate">-- CANDIDATE</div>
-              <div class="timeline-sub">Candidate Model</div>
-            </div>
-            <div class="timeline-connector">➔</div>
-            <div class="timeline-step">
-              <div class="timeline-pill pill-safe">EVIDENCE GATE</div>
-              <div class="timeline-sub">3 Windows + Holdout</div>
-            </div>
-            <div class="timeline-connector">➔</div>
-            <div class="timeline-step">
-              <div class="timeline-pill pill-unavailable" id="flow-gate">EVALUATION GATE</div>
-              <div class="timeline-sub">Gate Assessment</div>
-            </div>
-            <div class="timeline-connector">➔</div>
-            <div class="timeline-step">
-              <div class="timeline-pill pill-unavailable" id="flow-restored">-- ACTIVE</div>
-              <div class="timeline-sub">Production Model</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Rollback Safety & Proof Panel -->
-      <section class="card-section" id="rollback-panel" aria-label="Rollback Safety Properties">
-        <div class="section-header">
-          <div class="section-title">
-            <span>⏪</span>
-            <span>Rollback Safety & Proof Panel</span>
-          </div>
-          <span id="rollback-status-badge" class="status-pill pill-unavailable">CHECKING...</span>
-        </div>
-        <div class="panel-content">
-          <div class="rollback-properties-grid">
-            <div class="rb-prop-row">
-              <span class="info-label">Target Validation:</span>
-              <span class="info-value" id="rollback-target-val">
-                <span class="status-pill pill-unavailable">UNAVAILABLE</span>
-              </span>
-            </div>
-            <div class="rb-prop-row">
-              <span class="info-label">Atomic Pointer Switch:</span>
-              <span class="info-value" id="rollback-atomic-switch">
-                <span class="status-pill pill-unavailable">UNAVAILABLE</span>
-              </span>
-            </div>
-            <div class="rb-prop-row">
-              <span class="info-label">Replay Equality:</span>
-              <span class="info-value" id="rollback-replay-eq">
-                <span class="status-pill pill-unavailable">UNAVAILABLE</span>
-              </span>
-            </div>
-            <div class="rb-prop-row">
-              <span class="info-label">Restored Version:</span>
-              <span class="info-value" id="rollback-restored-ver">
-                <span class="status-pill pill-unavailable">UNAVAILABLE</span>
-              </span>
-            </div>
-          </div>
-          <div class="callout-box info" id="rollback-reason" style="font-size: 12px; margin-top: 4px;">
-            Deterministic replay provenance verified via transactional pointer restoration.
-          </div>
-          <div id="lifecycle-replay" style="display: none;"></div>
-        </div>
-      </section>
-
+    <!-- Modals (Global Overlays) -->
     <!-- Interactive Evidence Review Modal / Drawer -->
     <div id="evidence-modal" class="evidence-modal-backdrop" aria-hidden="true">
       <div class="evidence-modal-card" role="dialog" aria-modal="true" aria-labelledby="evidence-modal-title">
-        
         <div class="modal-header">
           <div>
             <div class="modal-badge-label">SAFETY GATE AUDIT</div>
@@ -346,10 +546,7 @@
           </div>
           <button id="close-evidence-btn" class="modal-close-btn" type="button" aria-label="Close Evidence Review">✕</button>
         </div>
-
         <div class="modal-body">
-          
-          <!-- Candidate & Active Strip -->
           <div class="modal-models-strip">
             <div class="modal-model-item">
               <span class="info-label">Candidate:</span>
@@ -363,7 +560,6 @@
             </div>
           </div>
 
-          <!-- Prominent Operational Explanation Block -->
           <div class="business-explainer-box">
             <div class="explainer-heading" id="gov-explainer-heading">Candidate Evaluation Narrative</div>
             <p class="explainer-narrative" id="gov-explainer-text">
@@ -375,7 +571,6 @@
             </div>
           </div>
 
-          <!-- 1. DEVELOPMENT ROLLING WINDOWS -->
           <div class="evidence-section-card">
             <div class="evidence-section-header">
               <div>
@@ -384,7 +579,6 @@
               </div>
               <div class="evidence-source-tag">Source: <code>promotion_decision_v0002.json</code></div>
             </div>
-            
             <table class="evidence-review-table">
               <thead>
                 <tr>
@@ -395,10 +589,8 @@
                 </tr>
               </thead>
               <tbody id="dev-evidence-tbody">
-                <!-- Dynamically populated from window_results -->
               </tbody>
             </table>
-
             <div class="modal-aggregate-strip" id="dev-evidence-aggregate">
               <div class="modal-agg-col">
                 <span class="info-label">Aggregate:</span>
@@ -411,7 +603,6 @@
             </div>
           </div>
 
-          <!-- 2. GROUPED HOLDOUT -->
           <div class="evidence-section-card">
             <div class="evidence-section-header">
               <div>
@@ -420,7 +611,6 @@
               </div>
               <div class="evidence-source-tag">Source: <code>promotion_decision_v0002.json</code></div>
             </div>
-            
             <div class="holdout-review-body">
               <div class="holdout-scope-line" id="holdout-gateways">-- unseen gateways</div>
               <div class="holdout-counts-grid">
@@ -444,7 +634,6 @@
             </div>
           </div>
 
-          <!-- 3. FINAL DECISION -->
           <div class="evidence-section-card final-decision-card">
             <div class="evidence-section-header">
               <div class="evidence-section-title">FINAL DECISION</div>
@@ -459,7 +648,6 @@
             </div>
           </div>
 
-          <!-- Fail-Closed Architecture Details -->
           <details class="accordion-drawer" id="fail-closed-drawer" style="margin-top: 4px;">
             <summary class="accordion-summary">
               <span class="accordion-title">🛡️ Why the Gate Fails Closed (Safety Architecture)</span>
@@ -489,12 +677,11 @@
               </div>
             </div>
           </details>
-
         </div>
       </div>
     </div>
 
-    <!-- Task 3: Interactive Dispatch Decision & Backlog Intelligence Modal -->
+    <!-- Interactive Dispatch Decision & Backlog Intelligence Modal -->
     <div id="backlog-modal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-labelledby="backlog-modal-title">
       <div class="modal-dialog">
         <div class="modal-header">
@@ -512,7 +699,6 @@
         </div>
 
         <div class="modal-body">
-          <!-- Operational Explainer Box -->
           <div class="business-explainer-box">
             <div class="explainer-heading" id="backlog-explainer-heading">Capacity Rationing & Backlog Rationale</div>
             <p class="explainer-narrative" id="backlog-explainer-text">
@@ -526,7 +712,6 @@
             </div>
           </div>
 
-          <!-- Dispatched vs Deferred Split Grid -->
           <div class="split-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 20px;">
             <div class="evidence-section-card">
               <div class="evidence-section-header">
@@ -585,73 +770,6 @@
             </div>
           </div>
 
-          <!-- Interactive Gateway Deferral Inspector -->
-          <div class="evidence-section-card" style="margin-bottom: 20px;">
-            <div class="evidence-section-header">
-              <div>
-                <div class="evidence-section-title">GATEWAY DEFERRAL INSPECTOR</div>
-                <div class="evidence-subtitle">Inspect individual gateway disposition and deferral rationale</div>
-              </div>
-              <span class="status-pill pill-pass">OPERATIONAL AUDIT</span>
-            </div>
-            <div class="holdout-review-body">
-              <div style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">
-                Enter a 12-hex Gateway ID to verify if it was allocated a technician visit or deferred to the backlog due to the 15-visit limit.
-              </div>
-              <div class="inspector-form-row">
-                <input type="text" id="backlog-lookup-input" class="inspector-input" placeholder="e.g. 0639EA5602C1" maxlength="17" />
-                <button type="button" id="backlog-lookup-btn" class="btn-evidence-review" style="padding: 9px 18px;">Inspect Gateway</button>
-              </div>
-              <div class="inspector-chips-row">
-                <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Quick Inspect:</span>
-                <button type="button" class="chip-btn" data-gw="0A2778A31BE3">0A2778A31BE3 (Rank 1 Dispatched)</button>
-                <button type="button" class="chip-btn" data-gw="0639EA5602C1">0639EA5602C1 (Rank 169 Deferred)</button>
-                <button type="button" class="chip-btn" data-gw="023AD5204E1C">023AD5204E1C (Ineligible Fleet Member)</button>
-              </div>
-              <div id="backlog-lookup-result" class="lookup-result-box">
-                <div style="color: var(--text-muted);">Enter a gateway ID above or click a quick sample to inspect its disposition.</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Single Ranked Object Continuity Proof (Rule 9A) -->
-          <div class="evidence-section-card" style="margin-bottom: 20px;">
-            <div class="evidence-section-header">
-              <div>
-                <div class="evidence-section-title">SINGLE RANKED OBJECT CONTINUITY (RULE 9A)</div>
-                <div class="evidence-subtitle">Pipeline architecture: one scoring pass feeds both dispatches and backlog</div>
-              </div>
-              <span class="status-pill pill-pass">DESIGN INVARIANT</span>
-            </div>
-            <div class="holdout-review-body">
-              <div class="pipeline-continuity-flow">
-                <div class="continuity-step">
-                  <div class="continuity-pill">1. Eligible Fleet</div>
-                  <div class="continuity-desc">Master filtering + UTC cutoff produces eligible gateway pool (e.g. 290 units)</div>
-                </div>
-                <div class="continuity-arrow">➔</div>
-                <div class="continuity-step">
-                  <div class="continuity-pill">2. Single Scoring Pass</div>
-                  <div class="continuity-desc">Scorer ranks all eligible units by score descending, breaking ties by canonical ID</div>
-                </div>
-                <div class="continuity-arrow">➔</div>
-                <div class="continuity-step">
-                  <div class="continuity-pill" style="border-color: #3b82f6;">3. Ranks 1–15 Dispatched</div>
-                  <div class="continuity-desc">Top 15 written strictly to predictions.csv (€5,700 technician commitment)</div>
-                </div>
-                <div class="continuity-arrow">➔</div>
-                <div class="continuity-step">
-                  <div class="continuity-pill" style="border-color: #f59e0b;">4. Ranks 16+ Deferred</div>
-                  <div class="continuity-desc">Remaining units written directly to backlog_report.json without re-scoring</div>
-                </div>
-              </div>
-              <div class="callout-box info" style="margin-top: 12px; font-size: 12px;">
-                <strong>Architecture Invariant:</strong> Neither output recomputes scores, rankings, or eligibility independently. Complete mathematical continuity is preserved across both artifacts.
-              </div>
-            </div>
-          </div>
-
-          <!-- Read-Only Safety Banner -->
           <div class="callout-box" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <strong style="color: #6ee7b7;">READ-ONLY AUDIT LAYER:</strong>
@@ -667,5 +785,6 @@
   </div>
 
   <script src="app.js"></script>
+  <script src="ux_shell.js"></script>
 </body>
 </html>
