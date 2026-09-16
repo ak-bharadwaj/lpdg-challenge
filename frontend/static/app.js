@@ -159,6 +159,7 @@ function populateGovernancePanel(promotion, activeReg) {
   const verdictPillEl = document.getElementById("gov-verdict-pill");
   const verdictCodeEl = document.getElementById("gov-verdict-code");
   const verdictSummaryEl = document.getElementById("gov-verdict-summary");
+  const govHeaderStatusEl = document.getElementById("gov-header-status");
   const finalGateDeployEl = document.getElementById("final-gate-deployment");
   const finalGateProtectEl = document.getElementById("final-gate-protection");
 
@@ -266,6 +267,10 @@ function populateGovernancePanel(promotion, activeReg) {
         verdictPillEl.textContent = `GATE: ${decision}`;
       }
       if (verdictCodeEl) verdictCodeEl.textContent = decisionCode;
+      if (govHeaderStatusEl) {
+        govHeaderStatusEl.className = isRejected ? "status-pill pill-rejected" : "status-pill pill-active";
+        govHeaderStatusEl.textContent = "DECISION FINAL";
+      }
     } else {
       if (bannerEl) bannerEl.className = "governance-verdict-banner unavailable";
       if (verdictPillEl) {
@@ -273,6 +278,10 @@ function populateGovernancePanel(promotion, activeReg) {
         verdictPillEl.textContent = "GATE: UNAVAILABLE";
       }
       if (verdictCodeEl) verdictCodeEl.textContent = "DECISION_UNDEFINED";
+      if (govHeaderStatusEl) {
+        govHeaderStatusEl.className = "status-pill pill-unavailable";
+        govHeaderStatusEl.textContent = "UNAVAILABLE";
+      }
     }
 
     const deployText = isRejected ? "Candidate NOT deployed" : (decision === "PROMOTE" ? "Candidate DEPLOYED" : "Candidate status UNAVAILABLE");
@@ -545,6 +554,10 @@ function populateGovernancePanel(promotion, activeReg) {
     if (modalFinalProtectEl) modalFinalProtectEl.textContent = "Production status unconfirmed";
     if (verdictSummaryEl) {
       verdictSummaryEl.textContent = promotion?.reason || "Promotion decision artifact unavailable. Run 'make promote' to evaluate candidate.";
+    }
+    if (govHeaderStatusEl) {
+      govHeaderStatusEl.className = "status-pill pill-unavailable";
+      govHeaderStatusEl.textContent = "UNAVAILABLE";
     }
 
     if (fcStep1Pill) renderUnavailable(fcStep1Pill, "Promotion evidence unavailable");
@@ -1107,7 +1120,9 @@ function populatePredictions(payload) {
     const rankClass = isTop3 ? "rank-badge rank-top3" : "rank-badge";
 
     const scoreNum = parseFloat(row.score);
-    const formattedScore = !isNaN(scoreNum) ? scoreNum.toFixed(6) : row.score;
+    const formattedScore = !isNaN(scoreNum)
+      ? (Number.isInteger(scoreNum) || scoreNum % 1 === 0 ? scoreNum.toFixed(0) : scoreNum.toFixed(2))
+      : row.score;
 
     tr.innerHTML = `
       <td><span class="${rankClass}">${row.rank}</span></td>
