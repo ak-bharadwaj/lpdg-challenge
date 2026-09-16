@@ -57,28 +57,20 @@ make run
 Part 2 is not a detached repository or separate deliverable; it is the production MLOps governance layer built directly into this project. Reviewers can verify the complete operational lifecycle using authoritative operator commands:
 
 ```powershell
-# Read-only operator status summary
-make ops-status
+$env:LIVE_DATA = ".\data"
+$env:LIVE_WEEK = "2026-02-02"
 
-# Read-only safety preflight check
-make ops-preflight
-
-# Live prediction inspection for operator week
-make ops-live
-make ops-predictions
-
-# Candidate evaluation against frozen promotion gate (v0002 rejection)
-make ops-evaluate CANDIDATE=v0002
-
-# Controlled candidate change demonstration (v_promotable fixture)
-make ops-change CANDIDATE=v_promotable
-
-# Authoritative operator rollback to certified baseline v0001
-make ops-rollback-to VERSION=v0001
-
-# Bit-for-bit replay equality verification
-make ops-verify
+.\make ops-status
+.\make ops-preflight
+.\make ops-live
+.\make ops-predictions
+.\make ops-evaluate CANDIDATE=v0002
+.\make ops-change CANDIDATE=v_promotable
+.\make ops-rollback-to VERSION=v0001
+.\make ops-verify
 ```
+
+> For live evaluator data, replace `LIVE_DATA` with the evaluator-supplied dataset path and `LIVE_WEEK` with the evaluator-supplied Monday. The live pipeline does not hard-code the challenge weeks.
 
 ---
 
