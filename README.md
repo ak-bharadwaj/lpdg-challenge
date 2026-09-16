@@ -20,7 +20,7 @@ Contract-governed MLOps lifecycle system for smart meter gateway risk scoring, f
 4. **3:30 – 4:45: Model Governance & Rejection of `v0002`**: Console `#governance` view and `make ops-evaluate CANDIDATE=v0002`; gate decision `GATE: REJECT` with status `DECISION FINAL`. Explains that while `v0002` reduced missed broken weeks from 71 to 60 in historical retrospective backtesting, Section 8 grouped holdout evaluation on 59 unseen physical gateways regressed (18 vs 17 missed broken weeks). Rejection is a successful safety outcome preserving baseline `v0001`.
 5. **4:45 – 5:45: Backlog Fleet Risk & Deferral Intelligence**: Console `#backlog` view; capacity rationing (15 dispatched / 275 deferred), Gateway Deferral Inspector, and Rule 9A Single Ranked Object Continuity proving that a single scoring pass feeds both `predictions.csv` and `backlog_report.json`. Proxy anomaly hours represent telemetry deviation, never realized monetary savings.
 6. **5:45 – 7:15: Live Model Change & Atomic Rollback Verification**: Console `#safety` view; controlled live change demonstration (`make ops-change CANDIDATE=v_promotable`), followed by authoritative operator rollback (`make ops-rollback-to VERSION=v0001`) and cryptographic replay verification (`make ops-verify`). Emphasizes that `v_promotable` is a deterministic lifecycle fixture, not evidence to promote `v0002`. Proves atomic pointer switch under 1ms and bit-for-bit replay equality.
-7. **7:15 – 8:00: Empirical Fleet Boundaries & Operational Roadmap**: `LIMITATIONS.md` disclosure of the 12 unprovisioned gateways (3.61% blind spot) classified as `NO_TELEMETRY` rather than inventing calm scores; two-week operational delta roadmap.
+7. **7:15 – 8:00: Empirical Fleet Boundaries & Operational Roadmap**: [`LIMITATIONS.md`](LIMITATIONS.md) disclosure of the 12 unprovisioned gateways (3.61% blind spot) classified as `NO_TELEMETRY` rather than inventing calm scores; two-week operational delta roadmap.
 
 ---
 
@@ -104,7 +104,7 @@ make ops-verify
 
 1. **`v0002` Gate Rejection**: Candidate `v0002` was rejected because the Section 8 grouped holdout evaluation on 59 unseen physical gateways regressed (missing 18 broken weeks versus 17 under baseline `v0001`). Rejection is an authoritative safety success.
 2. **Retrospective Development Result (71 $\to$ 60)**: The reduction from 71 to 60 missed broken weeks is an internal retrospective development proxy across historical backtest windows (November 2025 – January 2026), NOT hidden challenge performance.
-3. **`v_promotable` Fixture Purpose**: `v_promotable` is a dedicated, deterministic lifecycle fixture used exclusively to demonstrate candidate promotion and atomic rollback. It is NOT evidence that `v0002` should be promoted and carries no production performance claims (see [`docs/DECISIONS.md`](docs/DECISIONS.md) Section 4 and [`docs/MLOPS.md`](docs/MLOPS.md)).
+3. **`v_promotable` Fixture Purpose**: `v_promotable` is a dedicated, deterministic lifecycle fixture used exclusively to demonstrate candidate promotion and atomic rollback. It is NOT evidence that `v0002` should be promoted and carries no production performance claims (see [`DECISIONS.md`](DECISIONS.md) Section 4 and [`MLOPS.md`](MLOPS.md)).
 4. **Backlog Proxy Hours**: Proxy anomaly hours in `backlog_report.json` reflect telemetry deviation across deferred gateways under capacity rationing—they are never presented as realized euro savings.
 
 ---
@@ -149,11 +149,11 @@ lpdg-challenge/
 |-- policy.json        # Frozen promotion policy (10% threshold, holdout agreement, no regression)
 |-- tests/             # Automated test suite (unit, integration, contracts)
 |-- docs/
-|   |-- recording/
-|   |   |-- WALKTHROUGH_SCRIPT.md     # Verbatim 6–8 minute recording script & cue-sheet
-|   |   `-- LIVE_OPERATOR_REHEARSAL.md # Authoritative live evaluator execution runbook
-|   |-- DECISIONS.md   # Architectural decisions and governance rationale
-|   |-- MLOPS.md       # Detailed system design, contracts, and state machines
-|   `-- LIMITATIONS.md # Measured fleet boundaries (12-gateway blind spot)
+|   `-- recording/
+|       |-- WALKTHROUGH_SCRIPT.md     # Verbatim 6–8 minute recording script & cue-sheet
+|       `-- LIVE_OPERATOR_REHEARSAL.md # Authoritative live evaluator execution runbook
+|-- DECISIONS.md       # Architectural decisions and governance rationale
+|-- MLOPS.md           # Detailed system design, contracts, and state machines
+|-- LIMITATIONS.md     # Measured fleet boundaries (12-gateway blind spot)
 `-- AI-USAGE.md        # AI assistance disclosure and verification log
 ```
