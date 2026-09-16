@@ -32,22 +32,22 @@
         <div>
           <div class="nav-section-label">Operational Views</div>
           <nav class="nav-menu" role="tablist">
-            <a class="nav-item active" data-target="view-operations" role="tab" aria-selected="true" href="#operations">
+            <a class="nav-item active" id="tab-operations" data-target="view-operations" role="tab" aria-selected="true" aria-controls="view-operations" href="#operations">
               <span class="nav-icon">⚡</span>
               <span class="nav-text">Operations</span>
               <span class="nav-badge-pill">Top 15</span>
             </a>
-            <a class="nav-item" data-target="view-governance" role="tab" aria-selected="false" href="#governance">
+            <a class="nav-item" id="tab-governance" data-target="view-governance" role="tab" aria-selected="false" aria-controls="view-governance" href="#governance">
               <span class="nav-icon">⚖️</span>
               <span class="nav-text">Governance</span>
               <span class="nav-badge-pill">Gate</span>
             </a>
-            <a class="nav-item" data-target="view-backlog" role="tab" aria-selected="false" href="#backlog">
+            <a class="nav-item" id="tab-backlog" data-target="view-backlog" role="tab" aria-selected="false" aria-controls="view-backlog" href="#backlog">
               <span class="nav-icon">📋</span>
               <span class="nav-text">Backlog</span>
               <span class="nav-badge-pill">Ranks 16+</span>
             </a>
-            <a class="nav-item" data-target="view-safety" role="tab" aria-selected="false" href="#safety">
+            <a class="nav-item" id="tab-safety" data-target="view-safety" role="tab" aria-selected="false" aria-controls="view-safety" href="#safety">
               <span class="nav-icon">🛡️</span>
               <span class="nav-text">Safety</span>
               <span class="nav-badge-pill">Rollback</span>
@@ -64,13 +64,13 @@
         </div>
       </aside>
 
-      <!-- Main Workspace (Independently Scrollable per view) -->
+      <!-- Active View Workspace (scroll container for the currently displayed view) -->
       <main class="app-workspace">
 
         <!-- ===============================================================
              VIEW 1: OPERATIONS
              =============================================================== -->
-        <div id="view-operations" class="console-view active" role="tabpanel" aria-label="Operations View">
+        <div id="view-operations" class="console-view active" role="tabpanel" aria-labelledby="tab-operations" aria-label="Operations View">
           <div class="view-header">
             <div class="view-header-main">
               <div class="view-title-row">
@@ -191,7 +191,7 @@
         <!-- ===============================================================
              VIEW 2: GOVERNANCE
              =============================================================== -->
-        <div id="view-governance" class="console-view" role="tabpanel" aria-label="Governance View" hidden>
+        <div id="view-governance" class="console-view" role="tabpanel" aria-labelledby="tab-governance" aria-label="Governance View" hidden>
           <div class="view-header">
             <div class="view-header-main">
               <div class="view-title-row">
@@ -301,7 +301,7 @@
         <!-- ===============================================================
              VIEW 3: BACKLOG
              =============================================================== -->
-        <div id="view-backlog" class="console-view" role="tabpanel" aria-label="Backlog View" hidden>
+        <div id="view-backlog" class="console-view" role="tabpanel" aria-labelledby="tab-backlog" aria-label="Backlog View" hidden>
           <div class="view-header">
             <div class="view-header-main">
               <div class="view-title-row">
@@ -427,7 +427,7 @@
         <!-- ===============================================================
              VIEW 4: SAFETY
              =============================================================== -->
-        <div id="view-safety" class="console-view" role="tabpanel" aria-label="Safety View" hidden>
+        <div id="view-safety" class="console-view" role="tabpanel" aria-labelledby="tab-safety" aria-label="Safety View" hidden>
           <div class="view-header">
             <div class="view-header-main">
               <div class="view-title-row">
