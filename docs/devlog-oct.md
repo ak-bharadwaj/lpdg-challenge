@@ -6,3 +6,4 @@
 - [2026-10-05 17:15] refactor: improve query performance
 - [2026-10-06 15:19] test: mock external API responses
 - [2026-10-06 10:01] chore: cleanup deprecated utility methods
+- [2026-10-06 11:15] refactor: extract reusable middleware
