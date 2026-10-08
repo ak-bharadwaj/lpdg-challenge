@@ -12,3 +12,4 @@
 - [2026-10-08 18:21] chore: configure pre-commit hooks
 - [2026-10-08 21:19] refactor: optimize hot path in data pipeline
 - [2026-10-08 17:56] fix: correct off-by-one in pagination
+- [2026-10-08 11:55] feat: implement graceful shutdown hook
