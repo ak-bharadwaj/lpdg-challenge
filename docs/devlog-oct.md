@@ -11,3 +11,4 @@
 - [2026-10-07 20:57] docs: document schema migration steps
 - [2026-10-08 18:21] chore: configure pre-commit hooks
 - [2026-10-08 21:19] refactor: optimize hot path in data pipeline
+- [2026-10-08 17:56] fix: correct off-by-one in pagination
