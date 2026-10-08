@@ -9,3 +9,4 @@
 - [2026-10-06 11:15] refactor: extract reusable middleware
 - [2026-10-07 21:51] fix: prevent race condition in cache
 - [2026-10-07 20:57] docs: document schema migration steps
+- [2026-10-08 18:21] chore: configure pre-commit hooks
