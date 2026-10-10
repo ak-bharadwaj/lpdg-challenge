@@ -15,3 +15,4 @@
 - [2026-10-08 11:55] feat: implement graceful shutdown hook
 - [2026-10-08 20:19] fix: prevent race condition in cache
 - [2026-10-09 20:55] docs: document schema migration steps
+- [2026-10-10 08:31] refactor: decouple service dependencies
