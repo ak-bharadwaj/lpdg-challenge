@@ -18,3 +18,4 @@
 - [2026-10-10 08:31] refactor: decouple service dependencies
 - [2026-10-10 10:20] docs: update technical specification
 - [2026-10-10 12:08] chore: normalize import ordering
+- [2026-10-11 13:48] refactor: simplify state transition logic
