@@ -23,3 +23,4 @@
 - [2026-10-12 13:50] fix: correct timezone handling
 - [2026-10-14 09:47] refactor: decouple service dependencies
 - [2026-10-14 13:09] docs: update technical specification
+- [2026-10-14 10:10] chore: normalize import ordering
