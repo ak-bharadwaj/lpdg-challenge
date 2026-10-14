@@ -22,3 +22,4 @@
 - [2026-10-12 14:50] refactor: consolidate error types
 - [2026-10-12 13:50] fix: correct timezone handling
 - [2026-10-14 09:47] refactor: decouple service dependencies
+- [2026-10-14 13:09] docs: update technical specification
