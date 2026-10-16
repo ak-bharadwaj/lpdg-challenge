@@ -26,3 +26,4 @@
 - [2026-10-14 10:10] chore: normalize import ordering
 - [2026-10-14 16:31] test: validate concurrent access patterns
 - [2026-10-15 13:08] refactor: normalize response envelope
+- [2026-10-16 15:44] refactor: decouple service dependencies
