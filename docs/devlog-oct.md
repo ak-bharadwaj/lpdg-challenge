@@ -27,3 +27,4 @@
 - [2026-10-14 16:31] test: validate concurrent access patterns
 - [2026-10-15 13:08] refactor: normalize response envelope
 - [2026-10-16 15:44] refactor: decouple service dependencies
+- [2026-10-16 18:19] docs: update technical specification
