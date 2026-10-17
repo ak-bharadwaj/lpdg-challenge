@@ -29,3 +29,4 @@
 - [2026-10-16 15:44] refactor: decouple service dependencies
 - [2026-10-16 18:19] docs: update technical specification
 - [2026-10-16 15:55] chore: normalize import ordering
+- [2026-10-17 14:42] fix: sanitize user input in forms
