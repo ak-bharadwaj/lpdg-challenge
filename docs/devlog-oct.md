@@ -32,3 +32,4 @@
 - [2026-10-17 14:42] fix: sanitize user input in forms
 - [2026-10-18 14:59] refactor: normalize response envelope
 - [2026-10-18 11:02] docs: update onboarding guide
+- [2026-10-18 11:03] chore: archive completed milestones
