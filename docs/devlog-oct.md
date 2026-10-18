@@ -30,3 +30,4 @@
 - [2026-10-16 18:19] docs: update technical specification
 - [2026-10-16 15:55] chore: normalize import ordering
 - [2026-10-17 14:42] fix: sanitize user input in forms
+- [2026-10-18 14:59] refactor: normalize response envelope
