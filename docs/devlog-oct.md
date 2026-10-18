@@ -33,3 +33,4 @@
 - [2026-10-18 14:59] refactor: normalize response envelope
 - [2026-10-18 11:02] docs: update onboarding guide
 - [2026-10-18 11:03] chore: archive completed milestones
+- [2026-10-18 19:54] test: add coverage for boundary conditions
