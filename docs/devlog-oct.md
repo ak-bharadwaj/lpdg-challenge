@@ -35,3 +35,4 @@
 - [2026-10-18 11:03] chore: archive completed milestones
 - [2026-10-18 19:54] test: add coverage for boundary conditions
 - [2026-10-18 09:07] chore: update dependency constraints
+- [2026-10-18 14:45] refactor: consolidate error types
