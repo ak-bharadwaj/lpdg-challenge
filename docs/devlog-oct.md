@@ -38,3 +38,4 @@
 - [2026-10-18 14:45] refactor: consolidate error types
 - [2026-10-19 20:39] refactor: normalize response envelope
 - [2026-10-20 08:26] fix: handle malformed request gracefully
+- [2026-10-20 21:07] docs: add troubleshooting FAQ
