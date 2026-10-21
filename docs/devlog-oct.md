@@ -41,3 +41,4 @@
 - [2026-10-20 21:07] docs: add troubleshooting FAQ
 - [2026-10-20 11:43] refactor: decompose monolithic handler
 - [2026-10-20 20:07] docs: document retry mechanism
+- [2026-10-21 19:35] chore: remove unused feature flags
