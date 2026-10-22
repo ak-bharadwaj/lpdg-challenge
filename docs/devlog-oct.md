@@ -44,3 +44,4 @@
 - [2026-10-21 19:35] chore: remove unused feature flags
 - [2026-10-21 09:17] test: add regression test for #142
 - [2026-10-22 19:39] fix: handle malformed request gracefully
+- [2026-10-22 09:28] docs: add troubleshooting FAQ
