@@ -49,3 +49,4 @@
 - [2026-10-22 17:04] docs: document retry mechanism
 - [2026-10-22 16:47] chore: remove unused feature flags
 - [2026-10-23 18:58] test: add regression test for #142
+- [2026-10-24 11:22] fix: handle malformed request gracefully
