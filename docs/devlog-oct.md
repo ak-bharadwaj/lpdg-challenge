@@ -56,3 +56,4 @@
 - [2026-10-25 10:52] chore: align code style with linter
 - [2026-10-25 08:13] refactor: improve query performance
 - [2026-10-25 15:16] fix: resolve memory leak in worker
+- [2026-10-25 09:10] feat: add error boundary handling
