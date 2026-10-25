@@ -52,3 +52,4 @@
 - [2026-10-24 11:22] fix: handle malformed request gracefully
 - [2026-10-24 14:43] docs: add troubleshooting FAQ
 - [2026-10-25 12:20] chore: normalize import ordering
+- [2026-10-25 12:37] test: validate concurrent access patterns
