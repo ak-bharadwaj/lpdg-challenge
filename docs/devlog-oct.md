@@ -53,3 +53,4 @@
 - [2026-10-24 14:43] docs: add troubleshooting FAQ
 - [2026-10-25 12:20] chore: normalize import ordering
 - [2026-10-25 12:37] test: validate concurrent access patterns
+- [2026-10-25 10:52] chore: align code style with linter
