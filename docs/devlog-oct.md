@@ -51,3 +51,4 @@
 - [2026-10-23 18:58] test: add regression test for #142
 - [2026-10-24 11:22] fix: handle malformed request gracefully
 - [2026-10-24 14:43] docs: add troubleshooting FAQ
+- [2026-10-25 12:20] chore: normalize import ordering
