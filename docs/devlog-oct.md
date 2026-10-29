@@ -62,3 +62,4 @@
 - [2026-10-27 11:28] fix: handle malformed request gracefully
 - [2026-10-29 13:07] chore: archive completed milestones
 - [2026-10-29 11:12] test: add coverage for boundary conditions
+- [2026-10-29 16:34] chore: update dependency constraints
