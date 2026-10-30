@@ -65,3 +65,4 @@
 - [2026-10-29 16:34] chore: update dependency constraints
 - [2026-10-30 09:06] feat: add health check endpoint
 - [2026-10-30 17:18] fix: handle malformed request gracefully
+- [2026-10-30 17:55] docs: add troubleshooting FAQ
