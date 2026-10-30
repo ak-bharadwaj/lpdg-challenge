@@ -64,3 +64,4 @@
 - [2026-10-29 11:12] test: add coverage for boundary conditions
 - [2026-10-29 16:34] chore: update dependency constraints
 - [2026-10-30 09:06] feat: add health check endpoint
+- [2026-10-30 17:18] fix: handle malformed request gracefully
